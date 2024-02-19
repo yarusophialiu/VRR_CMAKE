@@ -55,6 +55,8 @@ bool PluginManager::loadPluginByName(std::string_view name)
 
 bool PluginManager::loadPlugin(const std::filesystem::path& path)
 {
+    std::cout << "Loading plugin: "<< path << std::endl; 
+    
     // Early exit if plugin is already loaded.
     {
         std::lock_guard<std::mutex> lock(mLibrariesMutex);

@@ -1,4 +1,5 @@
 add_subdirectory(CudaInterop)
+add_subdirectory(EncodeDecode)
 add_subdirectory(HelloDXR)
 add_subdirectory(MultiSampling)
 add_subdirectory(SampleAppTemplate)

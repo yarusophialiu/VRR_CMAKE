@@ -124,6 +124,7 @@ public:
     {
         std::lock_guard<std::mutex> lock(mClassDescsMutex);
         const ClassDesc<BaseT>* classDesc = findClassDesc<BaseT>(type);
+        std::cout << "createClass(" << type << ", ...) = classDesc " << classDesc  << std::endl;
         return classDesc ? classDesc->create(args...) : std::invoke_result_t<typename BaseT::PluginCreate, Args...>{nullptr};
     }
 
