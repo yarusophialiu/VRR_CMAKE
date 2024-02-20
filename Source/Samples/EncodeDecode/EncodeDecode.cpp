@@ -153,8 +153,8 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
     1536, 1200
     864, 676
     */
-    mWidth = 640;  // 1920, 4096, 1280, 854, 640, 960, 1024, 1280, 1440, 1423
-    mHeight = 360; // 1080, 2160, 720, 480, 360, 540, 600, 800, 900, 800
+    mWidth = 1920; // 1920, 4096, 1280, 854, 640, 960, 1024, 1280, 1440, 1423
+    mHeight = 1080; // 1080, 2160, 720, 480, 360, 540, 600, 800, 900, 800
     // int nEncoders = NvEncGetEncodeProfileGUIDCount();
 
     std::cout << '\n';
@@ -209,14 +209,14 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
     );
 
     
-    int mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
+    mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
     std::cout << "mipLevels: " << mipLevels << "\n";
 
     mpRtMip = getDevice()->createTexture2D(
         // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
         // ResourceBindFlags::ShaderResource
         //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
-        mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, mipLevels, nullptr,
+        mWidth, mHeight, ResourceFormat::RG32Float, 1, mipLevels, nullptr,
         ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource | ResourceBindFlags::RenderTarget
     );
 
@@ -254,10 +254,9 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     mpRenderGraph->createPass("GBuffer", "GBufferRaster", gBufferProps);
     mpRenderGraph->onResize(getTargetFbo().get());
     mpRenderGraph->setScene(mpScene);
+    //mpRenderGraph->addEdge("GBuffer.mvec");
     mpRenderGraph->markOutput("GBuffer.mvec");
-
-
- 
+    //mpRenderGraph->markOutput("GBuffer.diffuseOpacity");
 
     // auto currPos = mpCamera->getPosition();
     //// std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
@@ -294,8 +293,6 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 {
     pRenderContext->clearFbo(pTargetFbo.get(), kClearColor, 1.0f, 0, FboAttachmentType::All);
 
-
-
     // change camera position
     // std::cout << "\n";
     auto currPos = mpCamera->getPosition();
@@ -310,27 +307,12 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
     // currPos.z += 0.011;
     mpCamera->setPosition(currPos);
     mpRenderGraph->execute(pRenderContext);
+    //motionVectorResource = mpRenderGraph->getOutput("GBuffer.diffuseOpacity");
     motionVectorResource = mpRenderGraph->getOutput("GBuffer.mvec");
     motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);
 
 
     //pRenderContext->blit(motionVectorResource->getSRV(), mpRtMip->getRTV());
-
-    //////motionTexture = pTargetFbo->getRenderTargetView(0);
-    //// ref<Texture> colorTex = pTargetFbo->getColorTexture(0);
-    ////  use mpRtOut to get mipmaps
-    //// std::cout << "\n==============\n";
-    //createMipMaps(pRenderContext);
-    //std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), 10);
-    //std::cout << "Number of elements in level 10: " << val.size() << std::endl;
-    //std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;
-
-    //for (const auto& element : val)
-    //{
-    //    std::cout << "val " << static_cast<int>(element) << "\n"; // Print as integer
-    //}
-    //std::cout << "\n";
-
 
     /* std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z
                << ")\n";
@@ -1123,8 +1105,8 @@ void EncodeDecode::decodeFrameBuffer()
     CUVIDSOURCEDATAPACKET packet = {0};
     packet.payload = mVEncodeOutData.data();
     packet.payload_size = mVEncodeOutData.size();
-    bitstream_size += mVEncodeOutData.size();
-    std::cout << "bitstream_size " << bitstream_size << "\n";
+    // bitstream_size += mVEncodeOutData.size();
+    // std::cout << "bitstream_size " << bitstream_size << "\n";
     NVDEC_API_CALL(cuvidParseVideoData(mHParser, &packet));
 }
 
@@ -1341,7 +1323,6 @@ void EncodeDecode::createMipMaps(RenderContext* pRenderContext)
 {
     mpRtMip->generateMips(pRenderContext, false);
     uint32_t numMips = mpRtMip->getMipCount();
-    std::cout << "num mips: " << numMips << "\n";
 }
 
 
@@ -1370,23 +1351,20 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
     // mpRtOut and pTargetFbo have the same size, i.e. width height of reference frames
     //pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
 
-    //pRenderContext->blit(mpRtOut->getSRV(), mpRtMip->getRTV());
-
-    ////motionTexture = pTargetFbo->getRenderTargetView(0);
-    // ref<Texture> colorTex = pTargetFbo->getColorTexture(0);
-    //  use mpRtOut to get mipmaps
-    // std::cout << "\n==============\n";
 
     pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
     createMipMaps(pRenderContext);
-    std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), 9);
-    std::cout << "Number of elements in level 10: " << val.size() << std::endl;
-    std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;
+    // TODO: change mip level
+    std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), mipLevels-1);
+    std::cout << "mipLevels: " << mipLevels << std::endl;
+  /*  std::cout << "Number of elements in level 10: " << val.size() << std::endl;
+    std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;*/
+    float* t = (float*)val.data();
+    float t1 = t[0];
+    float t2 = t[1];
+    std::cout << "t1 " << t1 << "\n"; // Print as integer
+    std::cout << "t2 " << t2 << "\n"; // Print as integer
 
-    for (const auto& element : val)
-    {
-        std::cout << "val " << static_cast<int>(element) << "\n"; // Print as integer
-    }
     std::cout << "\n";
 
     //// write to bmp file

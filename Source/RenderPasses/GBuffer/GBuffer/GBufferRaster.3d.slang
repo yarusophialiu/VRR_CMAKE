@@ -75,6 +75,8 @@ float2 computeMotionVector(const VSOut vsOut, const int2 ipos)
     // Sample in previous frame in clip space coords, no jittering applied.
     float4 prevPosH = vsOut.prevPosH;
     // Remove camera jitter from motion vector
+    // calcMotionVector screen-space motion vector, return Motion vector pointing from 
+    // current to previous position expressed in sceen space [0,1] with origin in the top-left corner
     return calcMotionVector(pixelPos, prevPosH, gFrameDim) + float2(gScene.camera.data.jitterX, -gScene.camera.data.jitterY);
 }
 

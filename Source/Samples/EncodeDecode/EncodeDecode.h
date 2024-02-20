@@ -298,8 +298,9 @@ private:
     const char* decBaseFilePath = "decOutputBMP/";
     std::ofstream* fpEncOut;
 
-    const int frameLimit = 506; // 206, 516
-    const int frameRate = 30; 
+    const int frameLimit = 5; // 206, 516
+    const int frameRate = 30;
+    int mipLevels;
 
     unsigned int decodeMutex = 0;
 

@@ -8,6 +8,7 @@ add_dependencies(EncodeDecode GBuffer)
 
 target_sources(EncodeDecode PRIVATE
     EncodeDecode.cpp
+    # 1bitstream_size.cpp
     EncodeDecode.h
     stb_image_write.h
     ColorSpace.h

@@ -222,6 +222,7 @@ RenderPass* RenderGraph::getRenderPassAndNamePair(
 ) const
 {
     nameAndField = parseFieldName(fullname);
+    // std::cout << "\n\n(" << nameAndField.first << ", " << nameAndField.second << ")" << std::endl;
 
     RenderPass* pPass = getPass(nameAndField.first).get();
     FALCOR_CHECK(pPass, "Can't find render pass '{}'.", nameAndField.first);
