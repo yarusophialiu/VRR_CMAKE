@@ -201,18 +201,25 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
 
     // frame buffer we will render into, mpRtOut is falcor's object
     // the frame size here determines the windows size of reference frames
+
     mpRtOut = getDevice()->createTexture2D(
+        //mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
+        // TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
+        mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
+    );
+
+    
+    int mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
+    std::cout << "mipLevels: " << mipLevels << "\n";
+
+    mpRtMip = getDevice()->createTexture2D(
         // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
         // ResourceBindFlags::ShaderResource
         //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
-        mWidth,
-        mHeight,
-        ResourceFormat::BGRA8Unorm,
-        1,
-        1,
-        nullptr,
-        ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
+        mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, mipLevels, nullptr,
+        ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource | ResourceBindFlags::RenderTarget
     );
+
 
     //// cast into directx 12
     //// falcor's device, createtexture3d
@@ -247,7 +254,8 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     mpRenderGraph->createPass("GBuffer", "GBufferRaster", gBufferProps);
     mpRenderGraph->onResize(getTargetFbo().get());
     mpRenderGraph->setScene(mpScene);
-    mpRenderGraph->markOutput("GBuffer.guideNormalW");
+    mpRenderGraph->markOutput("GBuffer.mvec");
+
 
  
 
@@ -281,102 +289,12 @@ void EncodeDecode::onResize(uint32_t width, uint32_t height)
     }
 }
 
-//// called in sampleapp's runinternal
-// void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
-//{
-//     pRenderContext->clearFbo(pTargetFbo.get(), kClearColor, 1.0f, 0, FboAttachmentType::All);
-//
-//     // change camera position
-//     //std::cout << "\n";
-//     auto currPos = mpCamera->getPosition();
-//     std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
-//
-//     //// arcade
-//     // currPos.x += 0.00083692L;
-//     // currPos.y += -0.00188664L;
-//     // currPos.z += -0.00496207L;
-//     //
-//     // dielecctrics
-//     /* currPos.x += 0.00383692L;
-//      currPos.y += 0.00188664L;*/
-//
-//     // room
-//     currPos.x += 0.013;
-//     currPos.y += 0.004;
-//     currPos.z += 0.012;
-//
-//     mpCamera->setPosition(currPos);
-//    /* std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z
-//               << ")\n";
-//     std::cout << "\n";*/
-//
-//     // Ugly hack, just to get consistent videos
-//     static double timeSecs = 0;
-//
-//     if (mpScene)
-//     {
-//         Scene::UpdateFlags updates = mpScene->update(pRenderContext, timeSecs);
-//         if (is_set(updates, Scene::UpdateFlags::GeometryChanged))
-//             FALCOR_THROW("This sample does not support scene geometry changes.");
-//         if (is_set(updates, Scene::UpdateFlags::RecompileNeeded))
-//             FALCOR_THROW("This sample does not support scene changes that require shader recompilation.");
-//
-//         if (mRayTrace)
-//             renderRT(pRenderContext, pTargetFbo);
-//         else
-//             renderRaster(pRenderContext, pTargetFbo);
-//
-//         decodeMutex = 1;
-//         encodeFrameBuffer();
-//         while (decodeMutex == 1)
-//             ;
-//         printf("2");
-//         decodeMutex = 1;
-//         decodeFrameBuffer();
-//         printf("4");
-//
-//         static int fcount = 0;
-//
-//         while (decodeMutex == 1 && fcount > 0)
-//             ;
-//
-//         //if (fcount >=2 && fcount < frameLimit - 2)
-//         //  write to bmp file
-//         if (outputDecodedFrames && outputReferenceFrames)
-//         {
-//             snprintf(szDecOutFilePath, sizeof(szDecOutFilePath), "%s%d.bmp", decBaseFilePath, fcount);
-//             writeBMP(szDecOutFilePath, mPHostRGBAFrame, mWidth, mHeight);
-//
-//             snprintf(szRefOutFilePath, sizeof(szRefOutFilePath), "%s%d.bmp", refBaseFilePath, fcount);
-//             mpRtOut->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
-//
-//         }
-//         else if (outputDecodedFrames)
-//         {
-//             // Use snprintf to format the string with the count
-//             snprintf(szDecOutFilePath, sizeof(szDecOutFilePath), "%s%d.bmp", decBaseFilePath, fcount);
-//             writeBMP(szDecOutFilePath, mPHostRGBAFrame, mWidth, mHeight);
-//
-//         }
-//
-//         if (frameLimit > 0 && fcount >= frameLimit)
-//         {
-//             std::exit(0);
-//         }
-//
-//         ++fcount;
-//         timeSecs += 1.0 / 30.0;
-//
-//     }
-//
-//
-//     getTextRenderer().render(pRenderContext, getFrameRate().getMsg(), pTargetFbo, {20, 20});
-// }
-//
 
 void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
 {
     pRenderContext->clearFbo(pTargetFbo.get(), kClearColor, 1.0f, 0, FboAttachmentType::All);
+
+
 
     // change camera position
     // std::cout << "\n";
@@ -392,6 +310,27 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
     // currPos.z += 0.011;
     mpCamera->setPosition(currPos);
     mpRenderGraph->execute(pRenderContext);
+    motionVectorResource = mpRenderGraph->getOutput("GBuffer.mvec");
+    motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);
+
+
+    //pRenderContext->blit(motionVectorResource->getSRV(), mpRtMip->getRTV());
+
+    //////motionTexture = pTargetFbo->getRenderTargetView(0);
+    //// ref<Texture> colorTex = pTargetFbo->getColorTexture(0);
+    ////  use mpRtOut to get mipmaps
+    //// std::cout << "\n==============\n";
+    //createMipMaps(pRenderContext);
+    //std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), 10);
+    //std::cout << "Number of elements in level 10: " << val.size() << std::endl;
+    //std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;
+
+    //for (const auto& element : val)
+    //{
+    //    std::cout << "val " << static_cast<int>(element) << "\n"; // Print as integer
+    //}
+    //std::cout << "\n";
+
 
     /* std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z
                << ")\n";
@@ -413,21 +352,11 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
         else
             renderRaster(pRenderContext, pTargetFbo);
 
-        decodeMutex = 1;
         encodeFrameBuffer();
-        while (decodeMutex == 1)
-            ;
-        printf("2");
-        decodeMutex = 1;
         decodeFrameBuffer();
-        printf("4");
 
         static int fcount = 0;
 
-        while (decodeMutex == 1 && fcount > 0)
-            ;
-
-        // if (fcount >=2 && fcount < frameLimit - 2)
         //   write to bmp file
         if (outputDecodedFrames && outputReferenceFrames)
         {
@@ -450,7 +379,7 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
         }
 
         ++fcount;
-        timeSecs += 1.0 / 30.0;
+        timeSecs += 1.0 / frameRate;
     }
 
     getTextRenderer().render(pRenderContext, getFrameRate().getMsg(), pTargetFbo, {20, 20});
@@ -520,7 +449,7 @@ void EncodeDecode::makeDefaultEncodingParams(
     pIntializeParams->darWidth = mWidth;
     pIntializeParams->darHeight = mHeight;
     // Bitrate = Frame Rate × Frame Size × Bits per Pixel
-    pIntializeParams->frameRateNum = 30; // numerator
+    pIntializeParams->frameRateNum = frameRate; // numerator
     pIntializeParams->frameRateDen = 1;  // denominator, num/den = framerate
     pIntializeParams->enablePTD = 1;
     pIntializeParams->reportSliceOffsets = 0;
@@ -1054,7 +983,7 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
 
     printf("1");
 
-    decodeMutex = 0;
+    //decodeMutex = 0;
 
     return nvStatus;
 }
@@ -1293,12 +1222,11 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
     // don't need to transfer from cuda to cpu and to directx12
     // do: make the memory using directx12, write to the resource
 
-    decodeMutex = 0;
 
     // FramePresenterD3D11 presenter(mCudaContext, mWidth, /*mHeight);
     //presenterPtr->PresentDeviceFrame((uint8_t*)mPDecoderRGBAFrame, mWidth * 4, 0);
 
-    printf("3");
+    //printf("3");
 
     return 0;
 }
@@ -1409,6 +1337,14 @@ void EncodeDecode::renderRaster(RenderContext* pRenderContext, const ref<Fbo>& p
     mpScene->rasterize(pRenderContext, mpRasterPass->getState().get(), mpRasterPass->getVars().get());
 }
 
+void EncodeDecode::createMipMaps(RenderContext* pRenderContext)
+{
+    mpRtMip->generateMips(pRenderContext, false);
+    uint32_t numMips = mpRtMip->getMipCount();
+    std::cout << "num mips: " << numMips << "\n";
+}
+
+
 void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
 {
     FALCOR_ASSERT(mpScene);
@@ -1432,8 +1368,26 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
     */
 
     // mpRtOut and pTargetFbo have the same size, i.e. width height of reference frames
-    pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
-    ref<Texture> colorTex = pTargetFbo->getColorTexture(0);
+    //pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
+
+    //pRenderContext->blit(mpRtOut->getSRV(), mpRtMip->getRTV());
+
+    ////motionTexture = pTargetFbo->getRenderTargetView(0);
+    // ref<Texture> colorTex = pTargetFbo->getColorTexture(0);
+    //  use mpRtOut to get mipmaps
+    // std::cout << "\n==============\n";
+
+    pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
+    createMipMaps(pRenderContext);
+    std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), 9);
+    std::cout << "Number of elements in level 10: " << val.size() << std::endl;
+    std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;
+
+    for (const auto& element : val)
+    {
+        std::cout << "val " << static_cast<int>(element) << "\n"; // Print as integer
+    }
+    std::cout << "\n";
 
     //// write to bmp file
     // if (outputReferenceFrames)

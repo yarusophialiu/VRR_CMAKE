@@ -394,6 +394,7 @@ RenderPass::CompileData RenderGraphCompiler::prepPassCompilationData(const PassD
         if (hasPrefix(name, passData.name + "."))
         {
             auto pTex = pRes->asTexture();
+            int mipLevels = fmax(ceil(log2(pTex->getWidth())), ceil(log2(pTex->getHeight())));
             std::string resName = name.substr((passData.name + ".").size());
             compileData.connectedResources.addInput(resName, "External input resource")
                 .format(pTex->getFormat())
@@ -403,7 +404,7 @@ RenderPass::CompileData RenderGraphCompiler::prepPassCompilationData(const PassD
                     pTex->getHeight(),
                     pTex->getDepth(),
                     pTex->getSampleCount(),
-                    pTex->getMipCount(),
+                    mipLevels,
                     pTex->getArraySize()
                 );
         }

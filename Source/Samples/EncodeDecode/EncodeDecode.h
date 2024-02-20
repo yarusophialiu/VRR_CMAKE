@@ -131,6 +131,8 @@ private:
     void setPerFrameVars(const Fbo* pTargetFbo);
     void renderRaster(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo);
     void renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo);
+    void createMipMaps(RenderContext* pRenderContext); 
+
 
 private:
     // Device* mpDevice;
@@ -277,6 +279,10 @@ private:
     ref<Program> mpRaytraceProgram;
     ref<RtProgramVars> mpRtVars;
     ref<Texture> mpRtOut;
+    ref<Texture> mpRtMip;
+    ref<Resource> motionVectorResource;
+    ref<Texture> motionVectorTexture;
+
 
     bool mRayTrace = true;
     bool mUseDOF = false;
@@ -293,6 +299,7 @@ private:
     std::ofstream* fpEncOut;
 
     const int frameLimit = 506; // 206, 516
+    const int frameRate = 30; 
 
     unsigned int decodeMutex = 0;
 
