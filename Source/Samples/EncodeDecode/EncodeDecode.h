@@ -43,6 +43,10 @@ public:
     bool onKeyEvent(const KeyboardEvent& keyEvent) override;
     bool onMouseEvent(const MouseEvent& mouseEvent) override;
 
+public:
+    void setBitRate(unsigned int br);    // Setter for bitRate
+    void setFrameRate(unsigned int fps); // Setter for frameRate
+
 private:
     /*
 
@@ -130,7 +134,7 @@ private:
     void loadScene(const std::filesystem::path& path, const Fbo* pTargetFbo);
     void setPerFrameVars(const Fbo* pTargetFbo);
     void renderRaster(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo);
-    void renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo);
+    void renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo, int fCount);
     void createMipMaps(RenderContext* pRenderContext); 
 
 
@@ -287,8 +291,8 @@ private:
     bool mRayTrace = true;
     bool mUseDOF = false;
     bool outputEncodedFrames = false;   // output as h264 file
-    bool outputDecodedFrames = false;    // output as bmp file
-    bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
+    bool outputDecodedFrames = true;    // output as bmp file
+    bool outputReferenceFrames = true; // output Falcor rendered frames as bmp file
 
     uint32_t mSampleIndex = 0xdeadbeef;
     char szOutFilePath[256] = "encodedOutput264/out.h264";
@@ -298,8 +302,15 @@ private:
     const char* decBaseFilePath = "decOutputBMP/";
     std::ofstream* fpEncOut;
 
-    const int frameLimit = 5; // 206, 516
-    const int frameRate = 30;
+    char motionFilePath[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/motion.txt";
+
+    //const int frameRate = 30;
+    //const int frameLimit = 10 * frameRate / 30; // 206, 516
+
+    unsigned int frameRate;
+    uint32_t frameLimit;
+    unsigned int bitRate;
+
     int mipLevels;
 
     unsigned int decodeMutex = 0;

@@ -141,8 +141,13 @@ void writeBMP(const char* filename, uint8_t* imageData, int width, int height)
 
 // static const Falcor::float4 kClearColor(0.38f, 0.52f, 0.10f, 1);
 static const Falcor::float4 kClearColor(0.5f, 0.16f, 0.098f, 1);
+/*
+Arcade/Arcade.pyscene
+test_scenes/two_volumes.pyscene
+test_scenes/grey_and_white_room/grey_and_white_room.fbx
+*/
 static const std::string kDefaultScene = "Arcade/Arcade.pyscene";
-// static const std::string kDefaultScene = "Arcade/Arcade.pyscene"; // test_scenes/two_volumes.pyscene, Arcade/Arcade.pyscene,
+// static const std::string kDefaultScene = "Arcade/Arcade.pyscene";
 
 // constructor
 EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
@@ -153,9 +158,10 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
     1536, 1200
     864, 676
     */
-    mWidth = 1920; // 1920, 4096, 1280, 854, 640, 960, 1024, 1280, 1440, 1423
-    mHeight = 1080; // 1080, 2160, 720, 480, 360, 540, 600, 800, 900, 800
+    mWidth = config.windowDesc.width;   // 1920, 4096, 1280, 854, 640, 960, 1024, 1280, 1440, 1423
+    mHeight = config.windowDesc.height; // 1080, 2160, 720, 480, 360, 540, 600, 800, 900, 800
     // int nEncoders = NvEncGetEncodeProfileGUIDCount();
+
 
     std::cout << '\n';
     std::cout << "mWidth: " << mWidth << std::endl;
@@ -210,7 +216,7 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
 
     
     mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
-    std::cout << "mipLevels: " << mipLevels << "\n";
+    std::cout << "constructor mipLevels: " << mipLevels << "\n";
 
     mpRtMip = getDevice()->createTexture2D(
         // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
@@ -298,9 +304,13 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
     auto currPos = mpCamera->getPosition();
     // std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
     // room
-    currPos.x += 0.00083692f;
+ /*   currPos.x += 0.00083692f;
     currPos.y += -0.00188664f;
-    currPos.z += -0.00496207f;
+    currPos.z += -0.00496207f;*/
+    currPos.x += (0.00083692L * 30.0 / frameRate);
+    currPos.y += (-0.00188664L * 30.0 / frameRate);
+    currPos.z += (-0.00496207L * 30.0 / frameRate);
+
 
     // currPos.x += 0.013;
     // currPos.y += 0.004;
@@ -329,15 +339,16 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
         if (is_set(updates, Scene::UpdateFlags::RecompileNeeded))
             FALCOR_THROW("This sample does not support scene changes that require shader recompilation.");
 
+        static uint32_t fcount = 0;
+
         if (mRayTrace)
-            renderRT(pRenderContext, pTargetFbo);
+            renderRT(pRenderContext, pTargetFbo, fcount);
         else
             renderRaster(pRenderContext, pTargetFbo);
 
+        Sleep(100); // miliseconds,  avoid tearing
         encodeFrameBuffer();
         decodeFrameBuffer();
-
-        static int fcount = 0;
 
         //   write to bmp file
         if (outputDecodedFrames && outputReferenceFrames)
@@ -572,13 +583,13 @@ void EncodeDecode::initEncoder()
     // 3000000 4000000 (4000 - hd) 5000000, 8000000 (full hd) 10000000 15 Mbps - 30 Mbps 30000000 (4k)
     mEncodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
     mEncodeConfig.rcParams.multiPass = NV_ENC_TWO_PASS_FULL_RESOLUTION; // not valid for h264
-    mEncodeConfig.rcParams.averageBitRate = 30000000;
+    mEncodeConfig.rcParams.averageBitRate = bitRate;
     mEncodeConfig.rcParams.vbvBufferSize =
         (mEncodeConfig.rcParams.averageBitRate * mEncoderInitializeParams.frameRateDen / mEncoderInitializeParams.frameRateNum) * 5;
     mEncodeConfig.rcParams.maxBitRate = mEncodeConfig.rcParams.averageBitRate;
     mEncodeConfig.rcParams.vbvInitialDelay = mEncodeConfig.rcParams.vbvBufferSize;
 
-    std::cout << "averageBitRate " << mEncodeConfig.rcParams.averageBitRate << "\n";
+    std::cout << "\naverageBitRate " << mEncodeConfig.rcParams.averageBitRate << "\n";
 
     NVENC_API_CALL(mNVEnc.nvEncInitializeEncoder(mHEncoder, &mEncoderInitializeParams));
 
@@ -963,7 +974,7 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
 
     // std::cout << "write bitstream successfully!\n";
 
-    printf("1");
+    //printf("1");
 
     //decodeMutex = 0;
 
@@ -1123,7 +1134,7 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
 {
     static int count = 0;
     // We have parsed an entire frame! Now let's decode it
-    std::cout << "Frame found: " << count++ << "\n";
+    std::cout << "Frame found: " << count++ << "\n\n";
 
     //  A context represents the environment in which CUDA operations and computations take place
     CUDA_DRVAPI_CALL(cuCtxPushCurrent(mCudaContext)); // CUDA contexts are used to manage the state of the CUDA runtime
@@ -1310,6 +1321,21 @@ void EncodeDecode::setPerFrameVars(const Fbo* pTargetFbo)
     var["gOutput"] = mpRtOut;
 }
 
+
+void EncodeDecode::setBitRate(unsigned int br)
+{
+    bitRate = br; // Assign the private member
+}
+
+void EncodeDecode::setFrameRate(unsigned int fps)
+{
+    frameRate = fps; // Assign the private member
+    frameLimit = 68 * frameRate / 30.0;
+    // frameLimit = 135; // TODO: change to above line
+    std::cout << "setFrameRate  " << frameRate << "/n";
+}
+
+
 void EncodeDecode::renderRaster(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
 {
     FALCOR_ASSERT(mpScene);
@@ -1326,7 +1352,7 @@ void EncodeDecode::createMipMaps(RenderContext* pRenderContext)
 }
 
 
-void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
+void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo, int fCount)
 {
     FALCOR_ASSERT(mpScene);
     FALCOR_PROFILE(pRenderContext, "renderRT");
@@ -1356,16 +1382,35 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
     createMipMaps(pRenderContext);
     // TODO: change mip level
     std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), mipLevels-1);
-    std::cout << "mipLevels: " << mipLevels << std::endl;
+    std::cout << "renderRT mipLevels: " << mipLevels << std::endl;
+    //std::cout << "renderRT frameRate: " << frameRate << std::endl;
+    //std::cout << "renderRT bitRate: " << bitRate << std::endl;
   /*  std::cout << "Number of elements in level 10: " << val.size() << std::endl;
     std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;*/
     float* t = (float*)val.data();
     float t1 = t[0];
     float t2 = t[1];
-    std::cout << "t1 " << t1 << "\n"; // Print as integer
-    std::cout << "t2 " << t2 << "\n"; // Print as integer
+    //std::cout << "t1 " << t1 << "\n"; // Print as integer
+    //std::cout << "t2 " << t2 << "\n"; // Print as integer
 
-    std::cout << "\n";
+    double hypotenuse = sqrt(t1 * t1 + t2 * t2);
+    double velocity = frameRate * hypotenuse / 51;
+    //std::cout << "The hypotenuse of the right triangle is: " << hypotenuse << "\n";
+    std::cout << "v: " << velocity << "\n";
+    std::cout << "frameRate: " << frameRate << "\n";
+
+    std::ofstream outFile(motionFilePath, std::ios::app); // Open the file in append mode
+    
+    if (!outFile.is_open())
+    {
+        std::cerr << "Failed to open file: " << motionFilePath << std::endl;
+    }
+ /*   outFile << "t1: " << t1 << std::endl;
+    outFile << "t2: " << t2 << std::endl;
+    std::cout << "hypotenuse: " << hypotenuse << "\n";*/
+    outFile << "v: " << velocity << " frame " << fCount << std::endl;
+    outFile.close();
+
 
     //// write to bmp file
     // if (outputReferenceFrames)
@@ -1380,12 +1425,36 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
 
 int runMain(int argc, char** argv)
 {
+    unsigned int bitrate = std::stoi(argv[1]);
+    unsigned int framerate = std::stoi(argv[2]);
+    unsigned int width = std::stoi(argv[3]);
+    unsigned int height = std::stoi(argv[4]);
+
+    std::cout << "\n\nframerate runmain  " << framerate << "/n";
+    std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
+    std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
     SampleAppConfig config;
     config.windowDesc.title = "EncodeDecode";
     config.windowDesc.resizableWindow = true;
     config.colorFormat = ResourceFormat::BGRA8Unorm;
+    config.windowDesc.width = width;
+    config.windowDesc.height = height;
 
     EncodeDecode encodeDecode(config);
+    encodeDecode.setBitRate(bitrate * 1000);
+    encodeDecode.setFrameRate(framerate);
+
+
+    int mipLevels = fmax(ceil(log2(width)), ceil(log2(height)));
+    //std::cout << "constructor mipLevels: " << mipLevels << "\n";
+
+   /* char motionFile[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/motion.txt";
+    std::ofstream outFile(motionFile, std::ios::app);
+    outFile << "================ fps " << framerate << ", height " << height << ",  bitrate " << bitrate
+            << " =================" << std::endl;
+    outFile << "mipLevels " << mipLevels << "\n ";
+    outFile.close();*/
+
 
     return encodeDecode.run();
 }
