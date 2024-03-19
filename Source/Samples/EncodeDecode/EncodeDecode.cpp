@@ -1445,7 +1445,7 @@ int runMain(int argc, char** argv)
     encodeDecode.setFrameRate(framerate);
 
 
-    int mipLevels = fmax(ceil(log2(width)), ceil(log2(height)));
+    // int mipLevels = fmax(ceil(log2(width)), ceil(log2(height)));
     //std::cout << "constructor mipLevels: " << mipLevels << "\n";
 
    /* char motionFile[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/motion.txt";
