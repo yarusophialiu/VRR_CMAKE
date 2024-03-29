@@ -22,7 +22,7 @@
 
 #include <Windows.h>
 #include <wingdi.h>
-// #include "FramePresenterD3D11.h"
+#include "FramePresenterD3D11.h"
 
 #include <fstream>
 #include <filesystem>
@@ -1093,7 +1093,7 @@ void EncodeDecode::initDecoder()
     CUDA_DRVAPI_CALL(cuCtxPushCurrent(mCudaContext));
     NVDEC_API_CALL(cuvidCreateDecoder(&mHDecoder, &videoDecodeCreateInfo)); // create decoder
     CUDA_DRVAPI_CALL(cuCtxPopCurrent(nullptr));
-    //presenterPtr = new FramePresenterD3D11(mCudaContext, mWidth, mHeight);
+    presenterPtr = new FramePresenterD3D11(mCudaContext, mWidth, mHeight);
     makeDecoderOutputBuffers(); // allocate cuda memory
 }
 
@@ -1217,7 +1217,7 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
 
 
     // FramePresenterD3D11 presenter(mCudaContext, mWidth, /*mHeight);
-    //presenterPtr->PresentDeviceFrame((uint8_t*)mPDecoderRGBAFrame, mWidth * 4, 0);
+    presenterPtr->PresentDeviceFrame((uint8_t*)mPDecoderRGBAFrame, mWidth * 4, 0);
 
     //printf("3");
 

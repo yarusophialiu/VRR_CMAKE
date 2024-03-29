@@ -183,5 +183,7 @@ void rayGen()
     PrimaryRayData hitData;
     hitData.depth = 0;
     TraceRay(gScene.rtAccel, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, rayTypeCount, 0, ray, hitData);
-    gOutput[launchIndex.xy] = hitData.color;
+    // gOutput[launchIndex.xy] = hitData.color;
+    gOutput[launchIndex.xy] = float4(1, 0, 0, 1);
+
 }

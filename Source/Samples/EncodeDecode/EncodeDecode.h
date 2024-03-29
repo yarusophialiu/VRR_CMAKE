@@ -7,6 +7,8 @@
 #include "nvEncodeAPI.h"
 #include "nvcuvid.h"
 #include "cuviddec.h"
+#include "FramePresenterD3D11.h"
+
 
 #include "Falcor.h"
 #include "Core/SampleApp.h"
@@ -255,7 +257,7 @@ private:
     CUdeviceptr mPDecoderRGBAFrame = 0;
     uint8_t* mPHostRGBAFrame = nullptr;
 
-    //FramePresenterD3D11* presenterPtr = nullptr;
+    FramePresenterD3D11* presenterPtr = nullptr;
 
     ID3D12Resource* mPDecoderOutputTexture;
 
