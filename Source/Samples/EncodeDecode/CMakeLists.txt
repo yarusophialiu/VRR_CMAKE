@@ -4,16 +4,16 @@ add_falcor_executable(EncodeDecode)
 
 find_package(CUDAToolkit REQUIRED)
 
-add_dependencies(EncodeDecode GBuffer)
+add_dependencies(EncodeDecode GBuffer DeferredShading)
+# add_dependencies(EncodeDecode DeferredShading)
 
 target_sources(EncodeDecode PRIVATE
     EncodeDecode.cpp
-    # 1bitstream_size.cpp
     EncodeDecode.h
     stb_image_write.h
     ColorSpace.h
-    FramePresenterD3D11.h
-    FramePresenterD3D.h
+    # FramePresenterD3D11.h
+    # FramePresenterD3D.h
     EncodeDecode.3d.slang
     EncodeDecode.rt.slang
 )
