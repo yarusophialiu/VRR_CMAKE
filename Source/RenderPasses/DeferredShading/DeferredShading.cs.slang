@@ -32,6 +32,9 @@ cbuffer PerFrameCB
     float2 gStarDir3;
     float gWipe;
     bool gInPlace;
+
+    float2 posW;
+    float2 normW;
 }
 
 Texture2D<float4> gSrc;
@@ -210,4 +213,11 @@ void runPostFX(uint3 dispatchThreadId: SV_DispatchThreadID)
         output = gSrc[pixelPos];
     }
     gDst[pixelPos] = output;
+}
+
+
+[numthreads(16, 16, 1)]
+void runDeferredShading(uint3 dispatchThreadId: SV_DispatchThreadID) 
+{
+    
 }

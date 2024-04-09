@@ -48,6 +48,19 @@ static void regDeferredShading(pybind11::module& m)
     pass.def_property(kColorPowerScalar, &DeferredShading::getColorPowerScalar, &DeferredShading::setColorPowerScalar);
 }
 
+const ChannelList DeferredShading::kDeferredShadingChannels = {
+    // clang-format off
+    { "posW",           "gPosW",            "Position in world space",                           true /* optional */, ResourceFormat::RGBA32Float },
+    { "normW",          "gNormW",           "Shading normal in world space",                     true /* optional */, ResourceFormat::RGBA32Float },
+    { "tangentW",       "gTangentW",        "Shading tangent in world space (xyz) and sign (w)", true /* optional */, ResourceFormat::RGBA32Float },
+    { "faceNormalW",    "gFaceNormalW",     "Face normal in world space",                        true /* optional */, ResourceFormat::RGBA32Float },
+    { "texC",           "gTexC",            "Texture coordinate",                                true /* optional */, ResourceFormat::RG32Float   },
+    { "texGrads",       "gTexGrads",        "Texture gradients (ddx, ddy)",                      true /* optional */, ResourceFormat::RGBA16Float },
+    { "mvec",           "gMotionVector",    "Motion vector",                                     true /* optional */, ResourceFormat::RG32Float   },
+    { "mtlData",        "gMaterialData",    "Material data (ID, header.x, header.y, lobes)",     true /* optional */, ResourceFormat::RGBA32Uint  },
+    // clang-format on
+};
+
 extern "C" FALCOR_API_EXPORT void registerPlugin(Falcor::PluginRegistry& registry)
 {
     registry.registerClass<RenderPass, DeferredShading>();
@@ -143,6 +156,9 @@ RenderPassReflection DeferredShading::reflect(const CompileData& compileData)
         .bindFlags(ResourceBindFlags::RenderTarget | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess)
         .format(ResourceFormat::RGBA32Float)
         .texture2D(sz.x, sz.y);
+    
+    addRenderPassOutputs(reflector, kDeferredShadingChannels, ResourceBindFlags::UnorderedAccess, sz);
+
     return reflector;
 }
 
@@ -152,87 +168,34 @@ void DeferredShading::execute(RenderContext* pRenderContext, const RenderData& r
     auto pDst = renderData.getTexture(kDst);
     FALCOR_ASSERT(pSrc && pDst);
 
-    // Issue error and disable pass if I/O size doesn't match. The user can hit continue and fix the config or abort.
-    if (getEnabled() && (pSrc->getWidth() != pDst->getWidth() || pSrc->getHeight() != pDst->getHeight()))
-    {
-        logError("DeferredShading I/O sizes don't match. The pass will be disabled.");
-        mEnabled = false;
-    }
     const uint2 resolution = uint2(pSrc->getWidth(), pSrc->getHeight());
+    // const float2 dstresolution = float2(pDst->getWidth(), pSrc->getHeight());
+
+    // std::cout << "\n\npDst.x = " << dstresolution.x << std::endl;
 
     // if we have 'identity' settings, we can just copy input to output
     // clang-format off
-    if (getEnabled() == false || getWipe() >= 1.f || (
-        getBloomAmount() == 0.f &&
-        getChromaticAberrationAmount() == 0.f &&
-        getBarrelDistortAmount() == 0.f &&
-        all(getSaturationCurve() == float3(1.f)) &&
-        all(getColorOffset() == float3(0.5f)) &&
-        all(getColorScale() == float3(0.5f)) &&
-        all(getColorPower() == float3(0.5f)) &&
-        getColorOffsetScalar() == 0.f &&
-        getColorScaleScalar() == 0.f &&
-        getColorPowerScalar() == 0.f
-        ))
-    {
-        // wipe is all the way across, which corresponds to no effect
-        pRenderContext->blit(pSrc->getSRV(), pDst->getRTV());
-        return;
-    }
+    // if (getEnabled() == false || getWipe() >= 1.f || (
+    //     getBloomAmount() == 0.f &&
+    //     getChromaticAberrationAmount() == 0.f &&
+    //     getBarrelDistortAmount() == 0.f &&
+    //     all(getSaturationCurve() == float3(1.f)) &&
+    //     all(getColorOffset() == float3(0.5f)) &&
+    //     all(getColorScale() == float3(0.5f)) &&
+    //     all(getColorPower() == float3(0.5f)) &&
+    //     getColorOffsetScalar() == 0.f &&
+    //     getColorScaleScalar() == 0.f &&
+    //     getColorPowerScalar() == 0.f
+    //     ))
+    // {
+    //     // wipe is all the way across, which corresponds to no effect
+    //     std::cout << "about to blit" <<"\n";
+    //     pRenderContext->blit(pSrc->getSRV(), pDst->getRTV());
+    //     return;
+    // }
     // clang-format on
 
     preparePostFX(pRenderContext, resolution.x, resolution.y);
-    if (getBloomAmount() > 0.f)
-    {
-        // Downsampling
-        {
-            auto var = mpDownsamplePass->getRootVar();
-            var["gLinearSampler"] = mpLinearSampler;
-            for (int level = 0; level < kNumLevels; ++level)
-            {
-                uint2 res = {std::max(1u, resolution.x >> (level + 1)), std::max(1u, resolution.y >> (level + 1))};
-                float2 invres = float2(1.f / res.x, 1.f / res.y);
-                var["PerFrameCB"]["gResolution"] = res;
-                var["PerFrameCB"]["gInvRes"] = invres;
-                var["gSrc"] = level ? mpPyramid[level] : pSrc;
-                var["gDst"] = mpPyramid[level + 1];
-                mpDownsamplePass->execute(pRenderContext, uint3(res, 1));
-            }
-        }
-
-        // Upsampling
-        {
-            auto var = mpUpsamplePass->getRootVar();
-            var["gLinearSampler"] = mpLinearSampler;
-            var["PerFrameCB"]["gBloomAmount"] = getBloomAmount();
-            var["gSrc"] = pSrc;
-            for (int level = kNumLevels - 1; level >= 0; --level)
-            {
-                uint2 res = {std::max(1u, resolution.x >> level), std::max(1u, resolution.y >> level)};
-                float2 invres = float2(1.f / res.x, 1.f / res.y);
-                var["PerFrameCB"]["gResolution"] = res;
-                var["PerFrameCB"]["gInvRes"] = invres;
-                bool wantStar = level == 1 || level == 2;
-                var["PerFrameCB"]["gStar"] = (wantStar) ? getStarAmount() : 0.f;
-                if (wantStar)
-                {
-                    float ang = getStarAngle();
-                    var["PerFrameCB"]["gStarDir1"] = float2(std::sin(ang), std::cos(ang)) * invres * 2.f;
-                    ang += float(M_PI) / 3.f;
-                    var["PerFrameCB"]["gStarDir2"] = float2(std::sin(ang), std::cos(ang)) * invres * 2.f;
-                    ang += float(M_PI) / 3.f;
-                    var["PerFrameCB"]["gStarDir3"] = float2(std::sin(ang), std::cos(ang)) * invres * 2.f;
-                }
-                var["gBloomed"] = mpPyramid[level + 1];
-                var["gDst"] = mpPyramid[level];
-                // for most levels, we update the pyramid in place. for the last step, we read
-                // from the original source since we did not compute it in the downsample passes.
-                var["PerFrameCB"]["gInPlace"] = level > 0;
-                mpUpsamplePass->execute(pRenderContext, uint3(res, 1));
-            }
-        }
-    }
-
     {
         auto var = mpPostFXPass->getRootVar();
         var["PerFrameCB"]["gResolution"] = resolution;

@@ -81,6 +81,9 @@ public:
     void setColorScaleScalar(float v) { mColorScaleScalar = v; }
     void setColorPowerScalar(float v) { mColorPowerScalar = v; }
 
+protected:
+    static const ChannelList kDeferredShadingChannels;
+
 private:
     void preparePostFX(RenderContext* pRenderContext, uint32_t width, uint32_t height);
 

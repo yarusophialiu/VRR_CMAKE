@@ -253,16 +253,24 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     loadScene(kDefaultScene, getTargetFbo().get());
 
     Properties gBufferProps = {};
+    Properties deferredShadingProps = {};
 
-
+    // RenderGraph有DirectedGraph, DirectedGraph 存储了 PassId 和 EdgeId 的关系，
+    // 而 RenderGraph 则存储了两个 Id 所指向的资源。而这些关系的产生都在 addPass 和 addEdge 中完成
     mpRenderGraph = RenderGraph::create(mpDevice, "EncodeDecode");
     
     mpRenderGraph->createPass("GBuffer", "GBufferRaster", gBufferProps);
+
+    // create deferred shading pass: position, materials, normals
+    mpRenderGraph->createPass("DeferredShading", "DeferredShading", deferredShadingProps);
+    // add deferred shading pass
+
+
     mpRenderGraph->onResize(getTargetFbo().get());
     mpRenderGraph->setScene(mpScene);
-    //mpRenderGraph->addEdge("GBuffer.mvec");
-    mpRenderGraph->markOutput("GBuffer.mvec");
-    //mpRenderGraph->markOutput("GBuffer.diffuseOpacity");
+    mpRenderGraph->addEdge("GBuffer.posW", "DeferredShading.src"); // source texture, output texture
+    //mpRenderGraph->markOutput("GBuffer.mvec"); // Mark a render pass output as the graph's output.
+    mpRenderGraph->markOutput("DeferredShading.dst");
 
     // auto currPos = mpCamera->getPosition();
     //// std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
@@ -270,6 +278,8 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     // currPos.y = 0;
     // currPos.z = 0;
     // mpCamera->setPosition(currPos);
+
+    // add render pass
 }
 
 /*
@@ -318,7 +328,10 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
     mpCamera->setPosition(currPos);
     mpRenderGraph->execute(pRenderContext);
     //motionVectorResource = mpRenderGraph->getOutput("GBuffer.diffuseOpacity");
-    motionVectorResource = mpRenderGraph->getOutput("GBuffer.mvec");
+
+   /* motionVectorResource = mpRenderGraph->getOutput("GBuffer.mvec");
+    motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);*/
+    motionVectorResource = mpRenderGraph->getOutput("DeferredShading.dst");
     motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);
 
 
@@ -1275,6 +1288,8 @@ void EncodeDecode::loadScene(const std::filesystem::path& path, const Fbo* pTarg
     // rasterpass
     mpRasterPass = RasterPass::create(getDevice(), rasterProgDesc, defines);
 
+
+
     // We'll now create a raytracing program. To do that we need to setup two things:
     // - A program description (ProgramDesc). This holds all shader entry points, compiler flags, macro defintions,
     // etc.
@@ -1289,6 +1304,7 @@ void EncodeDecode::loadScene(const std::filesystem::path& path, const Fbo* pTarg
     ProgramDesc rtProgDesc;
     rtProgDesc.addShaderModules(shaderModules);
     rtProgDesc.addShaderLibrary("Samples/EncodeDecode/EncodeDecode.rt.slang");
+    rtProgDesc.addTypeConformances(typeConformances);
     rtProgDesc.addTypeConformances(typeConformances);
     rtProgDesc.setMaxTraceRecursionDepth(3); // 1 for calling TraceRay from RayGen, 1 for calling it from the
                                              // primary-ray ClosestHit shader for reflections, 1 for reflection ray
@@ -1330,8 +1346,8 @@ void EncodeDecode::setBitRate(unsigned int br)
 void EncodeDecode::setFrameRate(unsigned int fps)
 {
     frameRate = fps; // Assign the private member
-    frameLimit = 68 * frameRate / 30.0;
-    // frameLimit = 135; // TODO: change to above line
+    //frameLimit = 68 * frameRate / 30.0;
+     frameLimit = 10; // TODO: change to above line
     std::cout << "setFrameRate  " << frameRate << "/n";
 }
 
@@ -1375,41 +1391,36 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
     */
 
     // mpRtOut and pTargetFbo have the same size, i.e. width height of reference frames
-    //pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
+    pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
 
 
-    pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
-    createMipMaps(pRenderContext);
-    // TODO: change mip level
-    std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), mipLevels-1);
-    std::cout << "renderRT mipLevels: " << mipLevels << std::endl;
-    //std::cout << "renderRT frameRate: " << frameRate << std::endl;
-    //std::cout << "renderRT bitRate: " << bitRate << std::endl;
-  /*  std::cout << "Number of elements in level 10: " << val.size() << std::endl;
-    std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;*/
-    float* t = (float*)val.data();
-    float t1 = t[0];
-    float t2 = t[1];
-    //std::cout << "t1 " << t1 << "\n"; // Print as integer
-    //std::cout << "t2 " << t2 << "\n"; // Print as integer
+  //  pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
+  //  createMipMaps(pRenderContext);
+  //  // TODO: change mip level
+  //  std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), mipLevels-1);
+  //  std::cout << "renderRT mipLevels: " << mipLevels << std::endl;
+  ///*  std::cout << "Number of elements in level 10: " << val.size() << std::endl;
+  //  std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;*/
+  //  float* t = (float*)val.data();
+  //  float t1 = t[0];
+  //  float t2 = t[1];
+  //  //std::cout << "t1 " << t1 << "\n"; // Print as integer
 
-    double hypotenuse = sqrt(t1 * t1 + t2 * t2);
-    double velocity = frameRate * hypotenuse / 51;
-    //std::cout << "The hypotenuse of the right triangle is: " << hypotenuse << "\n";
-    std::cout << "v: " << velocity << "\n";
-    std::cout << "frameRate: " << frameRate << "\n";
+  //  double hypotenuse = sqrt(t1 * t1 + t2 * t2);
+  //  double velocity = frameRate * hypotenuse / 51;
+  //  // //std::cout << "The hypotenuse of the right triangle is: " << hypotenuse << "\n";
+  //  // std::cout << "v: " << velocity << "\n";
 
-    std::ofstream outFile(motionFilePath, std::ios::app); // Open the file in append mode
-    
-    if (!outFile.is_open())
-    {
-        std::cerr << "Failed to open file: " << motionFilePath << std::endl;
-    }
- /*   outFile << "t1: " << t1 << std::endl;
-    outFile << "t2: " << t2 << std::endl;
-    std::cout << "hypotenuse: " << hypotenuse << "\n";*/
-    outFile << "v: " << velocity << " frame " << fCount << std::endl;
-    outFile.close();
+//     std::ofstream outFile(motionFilePath, std::ios::app); // Open the file in append mode
+//     if (!outFile.is_open())
+//     {
+//         std::cerr << "Failed to open file: " << motionFilePath << std::endl;
+//     }
+//  /*   outFile << "t1: " << t1 << std::endl;
+//     outFile << "t2: " << t2 << std::endl;
+//     std::cout << "hypotenuse: " << hypotenuse << "\n";*/
+//     outFile << "v: " << velocity << " frame " << fCount << std::endl;
+//     outFile.close();
 
 
     //// write to bmp file
@@ -1425,14 +1436,25 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
 
 int runMain(int argc, char** argv)
 {
-    unsigned int bitrate = std::stoi(argv[1]);
+ /*   unsigned int bitrate = std::stoi(argv[1]);
     unsigned int framerate = std::stoi(argv[2]);
     unsigned int width = std::stoi(argv[3]);
-    unsigned int height = std::stoi(argv[4]);
+    unsigned int height = std::stoi(argv[4]);*/
+
+    unsigned int width = 1280;
+    unsigned int height = 720;
+    unsigned int bitrate = 3000;
+    unsigned int framerate = 30;
+
+
 
     std::cout << "\n\nframerate runmain  " << framerate << "/n";
-    std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
-    std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
+    std::cout << "bitrate runmain  " << bitrate << "/n";
+    std::cout << "width runmain  " << width << "/n";
+    std::cout << "height runmain  " << height << "/n";
+    //std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
+    //std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
+
     SampleAppConfig config;
     config.windowDesc.title = "EncodeDecode";
     config.windowDesc.resizableWindow = true;
