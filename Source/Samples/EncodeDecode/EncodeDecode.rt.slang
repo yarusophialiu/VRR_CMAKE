@@ -172,18 +172,26 @@ void rayGen()
     RayDesc ray;
     if (!useDOF)
     {
-        ray = gScene.camera.computeRayPinhole(launchIndex.xy, viewportDims).toRayDesc();
+        int n_samples = 4;
+
+        for (int i  = 0; i < n_samples; ++i) {
+
+            ray = gScene.camera.computeRayPinhole(launchIndex.xy, viewportDims).toRayDesc();
+            PrimaryRayData hitData;
+            hitData.depth = 0;
+            TraceRay(gScene.rtAccel, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, rayTypeCount, 0, ray, hitData);
+            gOutput[launchIndex.xy] += hitData.color / float(n_samples);
+
+            gOutput[launchIndex.xy] = float4(1, 0, 0, 1);
+
+        }
+
     }
     else
     {
-        float2 u = sampleNext2D(sg);
-        ray = gScene.camera.computeRayThinlens(launchIndex.xy, viewportDims, u).toRayDesc();
+        //float2 u = sampleNext2D(sg);
+        //ray = gScene.camera.computeRayThinlens(launchIndex.xy, viewportDims, u).toRayDesc();
     }
 
-    PrimaryRayData hitData;
-    hitData.depth = 0;
-    TraceRay(gScene.rtAccel, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, rayTypeCount, 0, ray, hitData);
-    // gOutput[launchIndex.xy] = hitData.color;
-    gOutput[launchIndex.xy] = float4(1, 0, 0, 1);
 
 }
