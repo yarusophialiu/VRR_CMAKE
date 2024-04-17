@@ -293,11 +293,12 @@ private:
     bool mRayTrace = true;
     bool mUseDOF = false;
     bool outputEncodedFrames = false;   // output as h264 file
-    bool outputDecodedFrames = false;  // output as bmp file
+    bool outputDecodedFrames = false;   // output as bmp file
     bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
 
     uint32_t mSampleIndex = 0xdeadbeef;
-    char szOutFilePath[256] = "encodedOutput264/out.h264";
+    //char szOutFilePath[256] = "encodedH264/out.h264";
+    char szOutFilePath[256] = "";
     char szRefOutFilePath[256];
     char szDecOutFilePath[256];
     const char* refBaseFilePath = "refOutputBMP/";

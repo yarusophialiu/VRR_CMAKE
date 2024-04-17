@@ -145,8 +145,12 @@ static const Falcor::float4 kClearColor(0.5f, 0.16f, 0.098f, 1);
 Arcade/Arcade.pyscene
 test_scenes/two_volumes.pyscene
 test_scenes/grey_and_white_room/grey_and_white_room.fbx
+SunTemple_v4/SunTemple_v4/SunTemple/SunTemple.pyscene
+Bistro/Bistro/BistroInterior_Wine.fbx
+Bistro/Bistro/BistroInterior.fbx
+Bistro/Bistro/BistroExterior.fbx
 */
-static const std::string kDefaultScene = "Arcade/Arcade.pyscene";
+static const std::string kDefaultScene = "SunTemple_v4/SunTemple_v4/SunTemple/SunTemple.pyscene";
 // static const std::string kDefaultScene = "Arcade/Arcade.pyscene";
 
 // constructor
@@ -176,22 +180,23 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
         // generate outputfile name with timestamp
         auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         std::stringstream ss;
-        ss << std::put_time(std::localtime(&now), "%Y%m%d_%H%M%S"); // Format the time as a string
+        ss << std::put_time(std::localtime(&now), "%m%d_%H%M%S"); // Format the time as a string
         std::string timestamp = ss.str();
-        std::string newFilePath = "encodedOutput264/out_" + timestamp + ".h264";
+        std::string newFilePath = "encodedH264/out_" + timestamp + ".h264";
         strncpy(szOutFilePath, newFilePath.c_str(), sizeof(szOutFilePath));
         szOutFilePath[sizeof(szOutFilePath) - 1] = '\0'; // Ensure null-termination
         std::cout << "szOutFilePath: " << szOutFilePath << std::endl;
 
-        fpEncOut = new std::ofstream(szOutFilePath, std::ios::out | std::ios::binary);
+        fpEncOut = new std::ofstream(szOutFilePath, std::ios::out | std::ios::binary | std::ios::app);
 
         if (!fpEncOut)
         {
             std::ostringstream err;
-            err << "Unable to open output file: " << szOutFilePath << std::endl;
+            err << "unable to open output file: " << szOutFilePath << std::endl;
             throw std::invalid_argument(err.str());
         }
     }
+
 
     // const ref<Device>& device = getDevice(); // get from falcor
     // mpDevice = device.get();
@@ -218,13 +223,13 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
     mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
     std::cout << "constructor mipLevels: " << mipLevels << "\n";
 
-    mpRtMip = getDevice()->createTexture2D(
-        // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
-        // ResourceBindFlags::ShaderResource
-        //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
-        mWidth, mHeight, ResourceFormat::RG32Float, 1, mipLevels, nullptr,
-        ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource | ResourceBindFlags::RenderTarget
-    );
+    //mpRtMip = getDevice()->createTexture2D(
+    //    // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
+    //    // ResourceBindFlags::ShaderResource , RG32Float
+    //    //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
+    //    mWidth, mHeight, ResourceFormat::RG32Float, 1, mipLevels, nullptr,
+    //    ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource | ResourceBindFlags::RenderTarget
+    //);
 
 
     //// cast into directx 12
@@ -271,15 +276,6 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     mpRenderGraph->addEdge("GBuffer.posW", "DeferredShading.src"); // source texture, output texture
     //mpRenderGraph->markOutput("GBuffer.mvec"); // Mark a render pass output as the graph's output.
     mpRenderGraph->markOutput("DeferredShading.dst");
-
-    // auto currPos = mpCamera->getPosition();
-    //// std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
-    // currPos.x = 0;
-    // currPos.y = 0;
-    // currPos.z = 0;
-    // mpCamera->setPosition(currPos);
-
-    // add render pass
 }
 
 /*
@@ -311,21 +307,21 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
     // change camera position
     // std::cout << "\n";
-    auto currPos = mpCamera->getPosition();
-    // std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
+    //auto currPos = mpCamera->getPosition();
+    //std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
     // room
  /*   currPos.x += 0.00083692f;
     currPos.y += -0.00188664f;
     currPos.z += -0.00496207f;*/
-    currPos.x += (0.00083692L * 30.0 / frameRate);
+ /*   currPos.x += (0.00083692L * 30.0 / frameRate);
     currPos.y += (-0.00188664L * 30.0 / frameRate);
-    currPos.z += (-0.00496207L * 30.0 / frameRate);
+    currPos.z += (-0.00496207L * 30.0 / frameRate);*/
 
 
     // currPos.x += 0.013;
     // currPos.y += 0.004;
     // currPos.z += 0.011;
-    mpCamera->setPosition(currPos);
+    //mpCamera->setPosition(currPos);
     mpRenderGraph->execute(pRenderContext);
     //motionVectorResource = mpRenderGraph->getOutput("GBuffer.diffuseOpacity");
 
@@ -359,7 +355,7 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
         else
             renderRaster(pRenderContext, pTargetFbo);
 
-        Sleep(100); // miliseconds,  avoid tearing
+        Sleep(200); // miliseconds,  avoid tearing
         encodeFrameBuffer();
         decodeFrameBuffer();
 
@@ -379,10 +375,10 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
             writeBMP(szDecOutFilePath, mPHostRGBAFrame, mWidth, mHeight);
         }
 
-        if (frameLimit > 0 && fcount >= frameLimit)
+        /*if (frameLimit > 0 && fcount >= frameLimit)
         {
             std::exit(0);
-        }
+        }*/
 
         ++fcount;
         timeSecs += 1.0 / frameRate;
@@ -948,6 +944,18 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
     picParams.completionEvent = mVPCompletionEvent[0];
     NVENCSTATUS nvStatus = mNVEnc.nvEncEncodePicture(mHEncoder, &picParams);
 
+
+    //static int countEncode = 0;
+    //std::cout << "Encode frame found : " << countEncode++ << "\n\n ";
+
+    // write encoded frames to out_.h264
+    if (outputEncodedFrames)
+    {
+        // std::cout << "write encoded h264 to: " << szOutFilePath << std::endl;
+        fpEncOut->write(reinterpret_cast<char*>(mVEncodeOutData.data()), mVEncodeOutData.size());
+    }
+
+
     waitForCompletionEvent(0); // wait for nvEncEncodePicture to finish
     // std::vector<uint8_t> mVEncodeOutData, containing bitstream data,
     // clear the previous encoded frame
@@ -972,11 +980,14 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
     // unlock a bitstream buffer that was previously locked for writing
     NVENC_API_CALL(mNVEnc.nvEncUnlockBitstream(mHEncoder, lockBitstreamData.outputBitstream));
 
-    // write encoded frames to out_.h264
-    if (outputEncodedFrames)
+
+   /* if (!fpEncOut)
     {
-        fpEncOut->write(reinterpret_cast<char*>(mVEncodeOutData.data()), mVEncodeOutData.size());
-    }
+        std::ostringstream err;
+        err << "Unable to open output file: " << szOutFilePath << std::endl;
+        throw std::invalid_argument(err.str());
+    }*/
+
 
     // The input resources (mVMappedInputBuffers[0]) used in the encoding process are unmapped
     NVENC_API_CALL(mNVEnc.nvEncUnmapInputResource(mHEncoder, mVMappedInputBuffers[0]));
@@ -1153,6 +1164,14 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
     CUDA_DRVAPI_CALL(cuCtxPushCurrent(mCudaContext)); // CUDA contexts are used to manage the state of the CUDA runtime
     NVDEC_API_CALL(cuvidDecodePicture(mHDecoder, pPicParams));
     CUDA_DRVAPI_CALL(cuCtxPopCurrent(NULL));
+
+    //// write encoded frames to out_.h264
+    //if (outputEncodedFrames)
+    //{
+    //    //std::cout << "write encoded h264 to: " << szOutFilePath << std::endl;
+    //    fpEncOut->write(reinterpret_cast<char*>(mVEncodeOutData.data()), mVEncodeOutData.size());
+    //}
+
 
     // provide information about a decoded picture
     CUVIDPARSERDISPINFO dispInfo;
@@ -1346,8 +1365,8 @@ void EncodeDecode::setBitRate(unsigned int br)
 void EncodeDecode::setFrameRate(unsigned int fps)
 {
     frameRate = fps; // Assign the private member
-    //frameLimit = 68 * frameRate / 30.0;
-     frameLimit = 10; // TODO: change to above line
+    frameLimit = 68 * frameRate / 30.0; // 68
+     //frameLimit = 10; // TODO: change to above line
     std::cout << "setFrameRate  " << frameRate << "/n";
 }
 
@@ -1436,14 +1455,14 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
 
 int runMain(int argc, char** argv)
 {
- /*   unsigned int bitrate = std::stoi(argv[1]);
+    /*unsigned int bitrate = std::stoi(argv[1]);
     unsigned int framerate = std::stoi(argv[2]);
     unsigned int width = std::stoi(argv[3]);
     unsigned int height = std::stoi(argv[4]);*/
 
     unsigned int width = 1280;
     unsigned int height = 720;
-    unsigned int bitrate = 3000;
+    unsigned int bitrate = 8000;
     unsigned int framerate = 30;
 
 

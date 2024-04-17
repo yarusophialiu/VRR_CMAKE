@@ -144,7 +144,7 @@ void primaryClosestHit(inout PrimaryRayData hitData, BuiltInTriangleIntersection
     }
 
     // Shoot a reflection ray.
-    color += getReflectionColor(sd, bsdfProperties, v.normalW, rayDirW, hitData.depth);
+    // color += getReflectionColor(sd, bsdfProperties, v.normalW, rayDirW, hitData.depth) * 0.01;
 
     hitData.color = float4(color, 1.f);
     hitData.hitT = hitT;
@@ -169,22 +169,32 @@ void rayGen()
     uint3 launchIndex = DispatchRaysIndex();
     TinyUniformSampleGenerator sg = TinyUniformSampleGenerator(launchIndex.xy, sampleIndex);
 
+    gOutput[launchIndex.xy] = float4(0, 0, 0, 1);
+    float4 result;
+
     RayDesc ray;
-    if (!useDOF)
+    if (!useDOF || true)
     {
-        int n_samples = 4;
+        int n_samples = 100;
+        // int n_samples = 5;
 
         for (int i  = 0; i < n_samples; ++i) {
 
-            ray = gScene.camera.computeRayPinhole(launchIndex.xy, viewportDims).toRayDesc();
+            float jitterX = (i) * 0.00002;
+            float jitterY = (i) * 0.00002;
+
+            ray = gScene.camera.computeRayPinhole(launchIndex.xy, viewportDims, jitterX, jitterY).toRayDesc();
+            
             PrimaryRayData hitData;
             hitData.depth = 0;
             TraceRay(gScene.rtAccel, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, rayTypeCount, 0, ray, hitData);
-            gOutput[launchIndex.xy] += hitData.color / float(n_samples);
-
-            gOutput[launchIndex.xy] = float4(1, 0, 0, 1);
-
+            result += hitData.color;
         }
+
+        result.rgb /= float(n_samples);
+        // result.rgb /= 5.0;
+        result.rgb = result.rgb / (1 + result.rgb);
+        gOutput[launchIndex.xy] = result;
 
     }
     else
