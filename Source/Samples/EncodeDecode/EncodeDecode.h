@@ -295,6 +295,7 @@ private:
     bool outputEncodedFrames = false;   // output as h264 file
     bool outputDecodedFrames = false;   // output as bmp file
     bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
+    // bool showDecode = true;
 
     uint32_t mSampleIndex = 0xdeadbeef;
     //char szOutFilePath[256] = "encodedH264/out.h264";
@@ -305,7 +306,7 @@ private:
     const char* decBaseFilePath = "decOutputBMP/";
     std::ofstream* fpEncOut;
 
-    char motionFilePath[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/motion.txt";
+    char motionFilePath[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/decOutputBMP/motion.txt";
 
     //const int frameRate = 30;
     //const int frameLimit = 10 * frameRate / 30; // 206, 516
