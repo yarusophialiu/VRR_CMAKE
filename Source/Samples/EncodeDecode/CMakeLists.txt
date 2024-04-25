@@ -4,7 +4,7 @@ add_falcor_executable(EncodeDecode)
 
 find_package(CUDAToolkit REQUIRED)
 
-add_dependencies(EncodeDecode GBuffer DeferredShading)
+add_dependencies(EncodeDecode GBuffer DeferredShading PythonImporter USDImporter)
 # add_dependencies(EncodeDecode DeferredShading)
 
 target_sources(EncodeDecode PRIVATE

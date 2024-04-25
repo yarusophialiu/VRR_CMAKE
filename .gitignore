@@ -1,6 +1,8 @@
 # Build folder.
 /build/
 
+/build_old/
+
 # Test output folder.
 /tests/data/
 
