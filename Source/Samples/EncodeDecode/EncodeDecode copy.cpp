@@ -71,12 +71,6 @@ simplelogger::Logger* logger = simplelogger::LoggerFactory::CreateConsoleLogger(
         }                                                               \
     } while (0)
 
-#define NVENC_THROW_ERROR( errorStr, errorCode )                                                         \
-    do                                                                                                   \
-    {                                                                                                    \
-        throw NVENCException::makeNVENCException(errorStr, errorCode, __FUNCTION__, __FILE__, __LINE__); \
-    } while (0)
-
 // Util function mapping ecoder pixel format ot DX12 pixel format
 DXGI_FORMAT GetD3D12Format(NV_ENC_BUFFER_FORMAT eBufferFormat)
 {
@@ -213,7 +207,6 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
         mpD3D12Device = mpDevice->getNativeHandle().as<ID3D12Device*>();
         mNInputFenceVal = 0;
         mNOutputFenceVal = 0;
-        mNDecodeFenceVal = 0;
 
         mNVEnc = {};
         mEBufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
@@ -225,7 +218,13 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
             // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
             // ResourceBindFlags::ShaderResource
             //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
-            mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
+            mWidth,
+            mHeight,
+            ResourceFormat::BGRA8Unorm,
+            1,
+            1,
+            nullptr,
+            ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
         );
 
         std::cout << "bitrate: " << bitRate << std::endl;
@@ -372,7 +371,7 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
         else
             renderRaster(pRenderContext, pTargetFbo);
 
-        Sleep(500); // miliseconds,  avoid tearing
+        Sleep(300); // miliseconds,  avoid tearing
             
         // allocate memory so encoder can work with what we need
         // one buffer each time
@@ -381,10 +380,6 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
         encodeFrameBuffer();
         decodeFrameBuffer();
-
-        // waitForCompletionEvent(1);
-        // cpuWaitForFencePoint(mpDecodeFence, mNDecodeFenceVal);
-
 
         //   write to bmp file
         if (outputDecodedFrames && outputReferenceFrames)
@@ -597,11 +592,6 @@ void EncodeDecode::initEncoder()
         // Error
     }
 
-    if (mpD3D12Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mpDecodeFence)) != S_OK)
-    {
-        // Error
-    }
-
     if (((uint32_t)mEncodeConfig.frameIntervalP) > mEncodeConfig.gopLength)
     {
         mEncodeConfig.frameIntervalP = mEncodeConfig.gopLength;
@@ -762,7 +752,6 @@ void EncodeDecode::makeEncoderInputBuffers(int32_t numInputBuffers)
         {
             // Error
             // NVENC_THROW_ERROR("Failed to create ID3D12Resource", NV_ENC_ERR_OUT_OF_MEMORY);
-            
         }
     }
 
@@ -835,26 +824,25 @@ void EncodeDecode::registerEncoderInputResources(int width, int height, NV_ENC_B
     This structure is often employed when registering resources with NVENC to ensure proper synchronization between the CPU and GPU.
     */
     NV_ENC_FENCE_POINT_D3D12 regRsrcInputFence;
+
     // Set input fence point
     memset(&regRsrcInputFence, 0, sizeof(NV_ENC_FENCE_POINT_D3D12));
     regRsrcInputFence.pFence = mpInputFence;
-    regRsrcInputFence.waitValue = mNInputFenceVal; // GPU will wait for the fence to reach mNInputFenceVal（0） before starting the encoding
+    regRsrcInputFence.waitValue = mNInputFenceVal;
     regRsrcInputFence.bWait = true;
-    
+
     // atomically increment the value of a variable
     // returns the incremented value
     InterlockedIncrement(&mNInputFenceVal);
-    regRsrcInputFence.signalValue = mNInputFenceVal; // fence will be set to mNInputFenceVal (1) after the GPU finishes its task.
-    regRsrcInputFence.bSignal = true;
 
+    regRsrcInputFence.signalValue = mNInputFenceVal;
+    regRsrcInputFence.bSignal = true;
 
     // get directx 12 resource information
     auto dx12InputTexture = mpRtOut->getNativeHandle().as<ID3D12Resource*>();
     D3D12_RESOURCE_DESC desc = dx12InputTexture->GetDesc();
+
     // Registering the DirectX 12 Resource with NVENC
-    // bind raw frame data for GPU-based processing
-    // tells NVENC to wait until the fence reaches waitValue before starting to encode, 
-    // and to signal (update) the fence to signalValue once encoding is complete.
     NV_ENC_REGISTERED_PTR registeredPtr = registerNVEncResource(
         dx12InputTexture,                   // DirectX 12 resource to be registered
         NV_ENC_INPUT_RESOURCE_TYPE_DIRECTX, // Type of the input resource (DirectX texture in this case)
@@ -889,8 +877,6 @@ void EncodeDecode::registerEncoderInputResources(int width, int height, NV_ENC_B
     mVMappedInputBuffers.resize(1);
 
     // CPU wait for register resource to finish
-    // cpu waits for the fence to reach the signalValue（1）
-    // if pfence < 1, wait 
     cpuWaitForFencePoint((ID3D12Fence*)regRsrcInputFence.pFence, regRsrcInputFence.signalValue);
     //}
 }
@@ -932,7 +918,6 @@ void EncodeDecode::mapEncoderResource(uint32_t bufferIndex)
 
 void EncodeDecode::cpuWaitForFencePoint(ID3D12Fence* pFence, uint64_t nFenceValue)
 {
-    UINT64 val = pFence->GetCompletedValue();
     if (pFence->GetCompletedValue() < nFenceValue)
     {
         if (pFence->SetEventOnCompletion(nFenceValue, mEvent) != S_OK)
@@ -952,25 +937,8 @@ void EncodeDecode::waitForCompletionEvent(int eventIndex)
     if (WaitForSingleObject(mVPCompletionEvent[eventIndex], 20000) == WAIT_FAILED)
     {
         // NVENC_THROW_ERROR("Failed to encode frame", NV_ENC_ERR_GENERIC);
-        std::cout << "Failed to encode frame.\n";
     }
 }
-
-
-// void EncodeDecode::ReleaseInputBuffers()
-// {
-
-//     UnregisterInputResources();
-
-//     for (uint32_t i = 0; i < m_vInputRsrc.size(); ++i)
-//     {
-//          delete m_vInputRsrc[i];
-//     }
-//     m_vInputRsrc.clear();
-
-//     m_vInputFrames.clear();
-// }
-
 
 /*
 map resources into memory
@@ -1057,8 +1025,6 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
     //printf("1");
 
     //decodeMutex = 0;
-    // cpuWaitForFencePoint(mpOutputFence, mNOutputFenceVal);
-    // waitForCompletionEvent(0);
 
     return nvStatus;
 }
@@ -1126,7 +1092,7 @@ void EncodeDecode::initDecoder()
     videoParserParameters.ulClockRate = 0;
     videoParserParameters.ulMaxDisplayDelay = 0; // 0 = no delay
     videoParserParameters.pUserData = this;
-    videoParserParameters.pfnSequenceCallback = nullptr; // nullptr
+    videoParserParameters.pfnSequenceCallback = nullptr;
     videoParserParameters.pfnDecodePicture = HandlePictureDecodeProc; // called once per frame
     videoParserParameters.pfnDisplayPicture = nullptr;
     videoParserParameters.pfnGetOperatingPoint = nullptr;
@@ -1196,8 +1162,6 @@ trigger handlePicutreDecode to perform decoding
 */
 void EncodeDecode::decodeFrameBuffer()
 {
-    InterlockedIncrement(&mNDecodeFenceVal);
-
     static int bitstream_size = 0;
     CUVIDSOURCEDATAPACKET packet = {0};
     packet.payload = mVEncodeOutData.data();
@@ -1307,9 +1271,7 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
     presenterPtr->PresentDeviceFrame((uint8_t*)mPDecoderRGBAFrame, mWidth * 4, 0);
     // }
     //printf("3");
-    mpDecodeFence->Signal(mNDecodeFenceVal);
 
-    cpuWaitForFencePoint(mpDecodeFence, mNDecodeFenceVal);
     return 0;
 }
 
@@ -1510,15 +1472,17 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
 
 int runMain(int argc, char** argv)
 {
-    unsigned int bitrate = std::stoi(argv[1]);
-    unsigned int framerate = std::stoi(argv[2]);
-    unsigned int width = std::stoi(argv[3]);
-    unsigned int height = std::stoi(argv[4]);
+    // unsigned int bitrate = std::stoi(argv[1]);
+    // unsigned int framerate = std::stoi(argv[2]);
+    // unsigned int width = std::stoi(argv[3]);
+    // unsigned int height = std::stoi(argv[4]);
 
-    // unsigned int width = 1280;
-    // unsigned int height = 720;
-    // unsigned int bitrate = 8000;
-    // unsigned int framerate = 30;
+    unsigned int width = 1280;
+    unsigned int height = 720;
+    unsigned int bitrate = 8000;
+    unsigned int framerate = 30;
+
+
 
     std::cout << "\n\nframerate runmain  " << framerate << "/n";
     std::cout << "bitrate runmain  " << bitrate << "/n";
@@ -1535,7 +1499,7 @@ int runMain(int argc, char** argv)
     config.windowDesc.height = height;
 
     EncodeDecode encodeDecode(config);
-    encodeDecode.setBitRate(bitrate * 1000); // 3000 bits per second,  3000 000 bits per second 
+    encodeDecode.setBitRate(bitrate * 1000);
     encodeDecode.setFrameRate(framerate);
 
 

@@ -2,7 +2,6 @@
 //
 #pragma once
 
-#include <filesystem>
 #include <iostream>
 #include <d3d12.h>
 #include <d3d11.h>
@@ -163,83 +162,73 @@ EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
     1536, 1200
     864, 676
     */
-   /* std::vector<unsigned int> bitrates = {3000, 4000, 5000};
-    for (unsigned int bitrate : bitrates)
-    {*/
-        mWidth = config.windowDesc.width;   // 1920, 4096, 1280, 854, 640, 960, 1024, 1280, 1440, 1423
-        mHeight = config.windowDesc.height; // 1080, 2160, 720, 480, 360, 540, 600, 800, 900, 800
-        // int nEncoders = NvEncGetEncodeProfileGUIDCount();
+    mWidth = config.windowDesc.width;   // 1920, 4096, 1280, 854, 640, 960, 1024, 1280, 1440, 1423
+    mHeight = config.windowDesc.height; // 1080, 2160, 720, 480, 360, 540, 600, 800, 900, 800
+    // int nEncoders = NvEncGetEncodeProfileGUIDCount();
 
-        std::cout << '\n';
-        std::cout << "mWidth: " << mWidth << std::endl;
-        std::cout << "mHeight: " << mHeight << std::endl;
-        std::cout << '\n';
 
-        // fpOut is an instance of std::ofstream that is associated
-        // with the specified output file (szOutFilePath) and is opened in binary output mode
-        // std::ofstream fpOut(szOutFilePath, std::ios::out | std::ios::binary);
-        if (outputEncodedFrames)
+    std::cout << '\n';
+    std::cout << "mWidth: " << mWidth << std::endl;
+    std::cout << "mHeight: " << mHeight << std::endl;
+    std::cout << '\n';
+
+    // fpOut is an instance of std::ofstream that is associated
+    // with the specified output file (szOutFilePath) and is opened in binary output mode
+    // std::ofstream fpOut(szOutFilePath, std::ios::out | std::ios::binary);
+    if (outputEncodedFrames)
+    {
+        // generate outputfile name with timestamp
+        auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&now), "%Y%m%d_%H%M%S"); // Format the time as a string
+        std::string timestamp = ss.str();
+        std::string newFilePath = "encodedOutput264/out_" + timestamp + ".h264";
+        strncpy(szOutFilePath, newFilePath.c_str(), sizeof(szOutFilePath));
+        szOutFilePath[sizeof(szOutFilePath) - 1] = '\0'; // Ensure null-termination
+        std::cout << "szOutFilePath: " << szOutFilePath << std::endl;
+
+        fpEncOut = new std::ofstream(szOutFilePath, std::ios::out | std::ios::binary);
+
+        if (!fpEncOut)
         {
-            // generate outputfile name with timestamp
-            auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&now), "%m%d_%H%M%S"); // Format the time as a string
-            std::string timestamp = ss.str();
-            std::string newFilePath = "encodedH264/out_" + timestamp + ".h264";
-            strncpy(szOutFilePath, newFilePath.c_str(), sizeof(szOutFilePath));
-            szOutFilePath[sizeof(szOutFilePath) - 1] = '\0'; // Ensure null-termination
-            std::cout << "szOutFilePath: " << szOutFilePath << std::endl;
-
-            fpEncOut = new std::ofstream(szOutFilePath, std::ios::out | std::ios::binary | std::ios::app);
-
-            if (!fpEncOut)
-            {
-                std::ostringstream err;
-                err << "unable to open output file: " << szOutFilePath << std::endl;
-                throw std::invalid_argument(err.str());
-            }
+            std::ostringstream err;
+            err << "Unable to open output file: " << szOutFilePath << std::endl;
+            throw std::invalid_argument(err.str());
         }
+    }
 
-        // const ref<Device>& device = getDevice(); // get from falcor
-        // mpDevice = device.get();
-        mpDevice = getDevice();
+    // const ref<Device>& device = getDevice(); // get from falcor
+    // mpDevice = device.get();
+    mpDevice = getDevice();
 
-        mpD3D12Device = mpDevice->getNativeHandle().as<ID3D12Device*>();
-        mNInputFenceVal = 0;
-        mNOutputFenceVal = 0;
+    mpD3D12Device = mpDevice->getNativeHandle().as<ID3D12Device*>();
+    mNInputFenceVal = 0;
+    mNOutputFenceVal = 0;
 
-        mNVEnc = {};
-        mEBufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
-        mCudaDevice = 0;
+    mNVEnc = {};
+    mEBufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
+    mCudaDevice = 0;
 
-        // frame buffer we will render into, mpRtOut is falcor's object
-        // the frame size here determines the windows size of reference frames
+    // frame buffer we will render into, mpRtOut is falcor's object
+    // the frame size here determines the windows size of reference frames
 
-        mpRtOut = getDevice()->createTexture2D(
-            // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
-            // ResourceBindFlags::ShaderResource
-            //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
-            mWidth,
-            mHeight,
-            ResourceFormat::BGRA8Unorm,
-            1,
-            1,
-            nullptr,
-            ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
-        );
+    mpRtOut = getDevice()->createTexture2D(
+        //mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
+        // TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
+        mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource
+    );
 
-        std::cout << "bitrate: " << bitRate << std::endl;
     
-    //mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
-    //std::cout << "constructor mipLevels: " << mipLevels << "\n";
+    mipLevels = fmax(ceil(log2(mWidth)), ceil(log2(mHeight)));
+    std::cout << "constructor mipLevels: " << mipLevels << "\n";
 
-    //mpRtMip = getDevice()->createTexture2D(
-    //    // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
-    //    // ResourceBindFlags::ShaderResource , RG32Float
-    //    //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
-    //    mWidth, mHeight, ResourceFormat::RG32Float, 1, mipLevels, nullptr,
-    //    ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource | ResourceBindFlags::RenderTarget
-    //);
+    mpRtMip = getDevice()->createTexture2D(
+        // mWidth, mHeight, ResourceFormat::BGRA8Unorm, 1, 1, nullptr, ResourceBindFlags::UnorderedAccess |
+        // ResourceBindFlags::ShaderResource
+        //  TODO: change the width and height of the reference frame size // 1920, 1080, 854, 480
+        mWidth, mHeight, ResourceFormat::RG32Float, 1, mipLevels, nullptr,
+        ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource | ResourceBindFlags::RenderTarget
+    );
 
 
     //// cast into directx 12
@@ -268,24 +257,23 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     loadScene(kDefaultScene, getTargetFbo().get());
 
     Properties gBufferProps = {};
-    Properties deferredShadingProps = {};
 
-    // RenderGraph有DirectedGraph, DirectedGraph 存储了 PassId 和 EdgeId 的关系，
-    // 而 RenderGraph 则存储了两个 Id 所指向的资源。而这些关系的产生都在 addPass 和 addEdge 中完成
+
     mpRenderGraph = RenderGraph::create(mpDevice, "EncodeDecode");
+    
     mpRenderGraph->createPass("GBuffer", "GBufferRaster", gBufferProps);
-
-    //// create deferred shading pass: position, materials, normals
-    //mpRenderGraph->createPass("DeferredShading", "DeferredShading", deferredShadingProps);
-    //// add deferred shading pass
-
     mpRenderGraph->onResize(getTargetFbo().get());
     mpRenderGraph->setScene(mpScene);
+    //mpRenderGraph->addEdge("GBuffer.mvec");
     mpRenderGraph->markOutput("GBuffer.mvec");
+    //mpRenderGraph->markOutput("GBuffer.diffuseOpacity");
 
-    //mpRenderGraph->addEdge("GBuffer.posW", "DeferredShading.src"); // source texture, output texture
-    ////mpRenderGraph->markOutput("GBuffer.mvec"); // Mark a render pass output as the graph's output.
-    //mpRenderGraph->markOutput("DeferredShading.dst");
+    // auto currPos = mpCamera->getPosition();
+    //// std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
+    // currPos.x = 0;
+    // currPos.y = 0;
+    // currPos.z = 0;
+    // mpCamera->setPosition(currPos);
 }
 
 /*
@@ -304,7 +292,6 @@ void EncodeDecode::onResize(uint32_t width, uint32_t height)
 
     if (mpCamera)
     {
-        // mpCamera->setPosition(Falcor::float3(0.107229, 1.44531, -1.40544));
         mpCamera->setFocalLength(18);
         float aspectRatio = (w / h);
         mpCamera->setAspectRatio(aspectRatio);
@@ -318,48 +305,39 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
     // change camera position
     // std::cout << "\n";
-    // auto currPos = mpCamera->getPosition();
-    //std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
+    auto currPos = mpCamera->getPosition();
+    // std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
     // room
  /*   currPos.x += 0.00083692f;
     currPos.y += -0.00188664f;
     currPos.z += -0.00496207f;*/
-
- /*   currPos.x += (0.00083692L * 30.0 / frameRate);
+    currPos.x += (0.00083692L * 30.0 / frameRate);
     currPos.y += (-0.00188664L * 30.0 / frameRate);
-    currPos.z += (-0.00496207L * 30.0 / frameRate);*/
-
-// [0.027533 0.00049  0.01221 ]
-// 0.0135L, 0.00025L, 0.0061L 
-    // currPos.x += (0.0675L * 30.0 / frameRate);
-    // currPos.y += (0.000125L * 30.0 / frameRate);
-    // currPos.z += (0.00305L * 30.0 / frameRate);
+    currPos.z += (-0.00496207L * 30.0 / frameRate);
 
 
     // currPos.x += 0.013;
     // currPos.y += 0.004;
     // currPos.z += 0.011;
-   // mpCamera->setPosition(currPos);
-   mpRenderGraph->execute(pRenderContext);
-   // //motionVectorResource = mpRenderGraph->getOutput("GBuffer.diffuseOpacity");
-   motionVectorResource = mpRenderGraph->getOutput("GBuffer.mvec");
-   motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);
-
-   // motionVectorResource = mpRenderGraph->getOutput("DeferredShading.dst");
-   // motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);
+    mpCamera->setPosition(currPos);
+    mpRenderGraph->execute(pRenderContext);
+    //motionVectorResource = mpRenderGraph->getOutput("GBuffer.diffuseOpacity");
+    motionVectorResource = mpRenderGraph->getOutput("GBuffer.mvec");
+    motionVectorTexture = static_ref_cast<Texture>(motionVectorResource);
 
 
     //pRenderContext->blit(motionVectorResource->getSRV(), mpRtMip->getRTV());
-    // createMipMaps(pRenderContext);
 
-    // std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n"; std::cout << "\n";
+    /* std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z
+               << ")\n";
+     std::cout << "\n";*/
 
     // Ugly hack, just to get consistent videos
     static double timeSecs = 0;
 
     if (mpScene)
     {
-        Scene::UpdateFlags updates = mpScene->update(pRenderContext, timeSecs); // 2* timesec, 0.5
+        Scene::UpdateFlags updates = mpScene->update(pRenderContext, timeSecs);
         if (is_set(updates, Scene::UpdateFlags::GeometryChanged))
             FALCOR_THROW("This sample does not support scene geometry changes.");
         if (is_set(updates, Scene::UpdateFlags::RecompileNeeded))
@@ -372,7 +350,7 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
         else
             renderRaster(pRenderContext, pTargetFbo);
 
-        Sleep(400); // miliseconds,  avoid tearing
+        Sleep(100); // miliseconds,  avoid tearing
         encodeFrameBuffer();
         decodeFrameBuffer();
 
@@ -961,18 +939,6 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
     picParams.completionEvent = mVPCompletionEvent[0];
     NVENCSTATUS nvStatus = mNVEnc.nvEncEncodePicture(mHEncoder, &picParams);
 
-
-    //static int countEncode = 0;
-    //std::cout << "Encode frame found : " << countEncode++ << "\n\n ";
-
-    // write encoded frames to out_.h264
-    if (outputEncodedFrames)
-    {
-        // std::cout << "write encoded h264 to: " << szOutFilePath << std::endl;
-        fpEncOut->write(reinterpret_cast<char*>(mVEncodeOutData.data()), mVEncodeOutData.size());
-    }
-
-
     waitForCompletionEvent(0); // wait for nvEncEncodePicture to finish
     // std::vector<uint8_t> mVEncodeOutData, containing bitstream data,
     // clear the previous encoded frame
@@ -997,14 +963,11 @@ NVENCSTATUS EncodeDecode::encodeFrameBuffer()
     // unlock a bitstream buffer that was previously locked for writing
     NVENC_API_CALL(mNVEnc.nvEncUnlockBitstream(mHEncoder, lockBitstreamData.outputBitstream));
 
-
-   /* if (!fpEncOut)
+    // write encoded frames to out_.h264
+    if (outputEncodedFrames)
     {
-        std::ostringstream err;
-        err << "Unable to open output file: " << szOutFilePath << std::endl;
-        throw std::invalid_argument(err.str());
-    }*/
-
+        fpEncOut->write(reinterpret_cast<char*>(mVEncodeOutData.data()), mVEncodeOutData.size());
+    }
 
     // The input resources (mVMappedInputBuffers[0]) used in the encoding process are unmapped
     NVENC_API_CALL(mNVEnc.nvEncUnmapInputResource(mHEncoder, mVMappedInputBuffers[0]));
@@ -1134,9 +1097,7 @@ void EncodeDecode::initDecoder()
     CUDA_DRVAPI_CALL(cuCtxPushCurrent(mCudaContext));
     NVDEC_API_CALL(cuvidCreateDecoder(&mHDecoder, &videoDecodeCreateInfo)); // create decoder
     CUDA_DRVAPI_CALL(cuCtxPopCurrent(nullptr));
-    // if (showDecode) {
     presenterPtr = new FramePresenterD3D11(mCudaContext, mWidth, mHeight);
-    // }
     makeDecoderOutputBuffers(); // allocate cuda memory
 }
 
@@ -1183,14 +1144,6 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
     CUDA_DRVAPI_CALL(cuCtxPushCurrent(mCudaContext)); // CUDA contexts are used to manage the state of the CUDA runtime
     NVDEC_API_CALL(cuvidDecodePicture(mHDecoder, pPicParams));
     CUDA_DRVAPI_CALL(cuCtxPopCurrent(NULL));
-
-    //// write encoded frames to out_.h264
-    //if (outputEncodedFrames)
-    //{
-    //    //std::cout << "write encoded h264 to: " << szOutFilePath << std::endl;
-    //    fpEncOut->write(reinterpret_cast<char*>(mVEncodeOutData.data()), mVEncodeOutData.size());
-    //}
-
 
     // provide information about a decoded picture
     CUVIDPARSERDISPINFO dispInfo;
@@ -1268,9 +1221,8 @@ int EncodeDecode::handlePictureDecode(CUVIDPICPARAMS* pPicParams)
 
 
     // FramePresenterD3D11 presenter(mCudaContext, mWidth, /*mHeight);
-    // if (presenterPtr) {
     presenterPtr->PresentDeviceFrame((uint8_t*)mPDecoderRGBAFrame, mWidth * 4, 0);
-    // }
+
     //printf("3");
 
     return 0;
@@ -1298,8 +1250,7 @@ void EncodeDecode::loadScene(const std::filesystem::path& path, const Fbo* pTarg
 
     // Update the controllers
     float radius = mpScene->getSceneBounds().radius();
-    // std::cout << "speed: " << radius * 0.25f << "\n"; // 3.24528
-    mpScene->setCameraSpeed(10.f); // radius * 0.25f
+    mpScene->setCameraSpeed(radius * 0.25f);
     float nearZ = std::max(0.1f, radius / 750.0f);
     float farZ = radius * 10;
     mpCamera->setDepthRange(nearZ, farZ);
@@ -1328,8 +1279,6 @@ void EncodeDecode::loadScene(const std::filesystem::path& path, const Fbo* pTarg
     // rasterpass
     mpRasterPass = RasterPass::create(getDevice(), rasterProgDesc, defines);
 
-
-
     // We'll now create a raytracing program. To do that we need to setup two things:
     // - A program description (ProgramDesc). This holds all shader entry points, compiler flags, macro defintions,
     // etc.
@@ -1344,7 +1293,6 @@ void EncodeDecode::loadScene(const std::filesystem::path& path, const Fbo* pTarg
     ProgramDesc rtProgDesc;
     rtProgDesc.addShaderModules(shaderModules);
     rtProgDesc.addShaderLibrary("Samples/EncodeDecode/EncodeDecode.rt.slang");
-    rtProgDesc.addTypeConformances(typeConformances);
     rtProgDesc.addTypeConformances(typeConformances);
     rtProgDesc.setMaxTraceRecursionDepth(3); // 1 for calling TraceRay from RayGen, 1 for calling it from the
                                              // primary-ray ClosestHit shader for reflections, 1 for reflection ray
@@ -1386,8 +1334,8 @@ void EncodeDecode::setBitRate(unsigned int br)
 void EncodeDecode::setFrameRate(unsigned int fps)
 {
     frameRate = fps; // Assign the private member
-    frameLimit = 68 * frameRate / 30.0; // 68, 34
-     //frameLimit = 10; // TODO: change to above line
+    frameLimit = 68 * frameRate / 30.0;
+    // frameLimit = 135; // TODO: change to above line
     std::cout << "setFrameRate  " << frameRate << "/n";
 }
 
@@ -1431,27 +1379,32 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
     */
 
     // mpRtOut and pTargetFbo have the same size, i.e. width height of reference frames
-    pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
+    //pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
 
-    pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
-  //  pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
-    createMipMaps(pRenderContext);
-  //  // TODO: change mip level
-    std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), mipLevels-1);
-    std::cout << "renderRT mipLevels: " << mipLevels << std::endl;
-  ///*  std::cout << "Number of elements in level 10: " << val.size() << std::endl;
-  //  std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;*/
-    float* t = (float*)val.data();
-    float t1 = t[0];
-    float t2 = t[1];
-    std::cout << "t1 " << t1 << "\n"; // Print as integer
 
-    double hypotenuse = sqrt(t1 * t1 + t2 * t2);
-    double velocity = frameRate * hypotenuse / 51;
-  //  // //std::cout << "The hypotenuse of the right triangle is: " << hypotenuse << "\n";
-  //  // std::cout << "v: " << velocity << "\n";
+    // pRenderContext->blit(motionVectorTexture->getSRV(), mpRtMip->getRTV());
+    // createMipMaps(pRenderContext);
+    // // TODO: change mip level
+    // std::vector<uint8_t> val = pRenderContext->readTextureSubresource(mpRtMip.get(), mipLevels-1);
+    // std::cout << "renderRT mipLevels: " << mipLevels << std::endl;
+    //std::cout << "renderRT frameRate: " << frameRate << std::endl;
+    //std::cout << "renderRT bitRate: " << bitRate << std::endl;
+  /*  std::cout << "Number of elements in level 10: " << val.size() << std::endl;
+    std::cout << "Number of elements in level 0: " << pRenderContext->readTextureSubresource(mpRtMip.get(), 0).size() << std::endl;*/
+    // float* t = (float*)val.data();
+    // float t1 = t[0];
+    // float t2 = t[1];
+    // std::cout << "t1 " << t1 << "\n"; // Print as integer
+    // std::cout << "t2 " << t2 << "\n"; // Print as integer
+
+    // double hypotenuse = sqrt(t1 * t1 + t2 * t2);
+    // double velocity = frameRate * hypotenuse / 51;
+    // //std::cout << "The hypotenuse of the right triangle is: " << hypotenuse << "\n";
+    // std::cout << "v: " << velocity << "\n";
+    // std::cout << "frameRate: " << frameRate << "\n";
 
     // std::ofstream outFile(motionFilePath, std::ios::app); // Open the file in append mode
+    
     // if (!outFile.is_open())
     // {
     //     std::cerr << "Failed to open file: " << motionFilePath << std::endl;
@@ -1478,19 +1431,13 @@ int runMain(int argc, char** argv)
     // unsigned int width = std::stoi(argv[3]);
     // unsigned int height = std::stoi(argv[4]);
 
-    unsigned int width = 1920;
-    unsigned int height = 1080;
+    // std::cout << "\n\nframerate runmain  " << framerate << "/n";
+    // std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
+    // std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
+    unsigned int width = 1280;
+    unsigned int height = 720;
     unsigned int bitrate = 2000;
     unsigned int framerate = 30;
-
-
-
-    std::cout << "\n\nframerate runmain  " << framerate << "/n";
-    std::cout << "bitrate runmain  " << bitrate << "/n";
-    std::cout << "width runmain  " << width << "/n";
-    std::cout << "height runmain  " << height << "/n";
-    //std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
-    //std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
 
     SampleAppConfig config;
     config.windowDesc.title = "EncodeDecode";
@@ -1520,7 +1467,5 @@ int runMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    std::cout << "Current Path: " << std::filesystem::current_path() << std::endl;
-    // unsigned int bitrate = 3000;
     return catchAndReportAllExceptions([&]() { return runMain(argc, argv); });
 }

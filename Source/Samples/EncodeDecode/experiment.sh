@@ -1,18 +1,18 @@
 #!/bin/bash
 # run through git bash
 
-BITRATES=(4000 8000 16000) 
+BITRATES=(2000) 
 # BITRATES=(500 1000 2000 4000 8000 16000 32000) 
 
 # RESOLUTION=480
 
-FRAMERATE=(30 40 50 100 110) 
+FRAMERATE=(160) 
 # FRAMERATE=(30 40 50 60 70 80 90 100 110 120) 
 # FRAMERATE=(30 40 50 60 70 80 90 100 110 120 130 140 150 160 165) 
 
 # resolutions=("1920x1080" "1536x864" "1280x720" "960x540" "854x480" "640x360") # "1200x676"
-resolutions=("1920x1080" "1536x864" "1280x720" "854x480" "640x360")
-# resolutions=("640x360")
+# resolutions=("1920x1080" "1536x864" "1280x720" "854x480" "640x360")
+resolutions=("3840x2160")
 
 
 for resolution in "${resolutions[@]}"
@@ -42,5 +42,7 @@ done
 
 # gcc EncodeDecode.cpp -o outputfile.exe -I "../../../../Source/Falcor/"
 # C:/Users/15142/source/repos/Falcor/Falcor/build/Source/PerceptualRendering/EncodeDecode
+
 # C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode
+
 # C:/Users/15142/new/Falcor/build/windows-vs2022/bin/Debug

@@ -102,6 +102,8 @@ private:
     // NVENCSTATUS encodeFrameBuffer(std::ofstream& fpOut);
     NVENCSTATUS encodeFrameBuffer();
 
+    // void EncodeDecode::ReleaseInputBuffers();
+
     /*
 
 
@@ -187,8 +189,11 @@ private:
     // here, fence lets the program pause until decoding is done to a frame
     ID3D12Fence* mpInputFence;
     ID3D12Fence* mpOutputFence;
+    ID3D12Fence* mpDecodeFence;
+
     uint64_t mNInputFenceVal;
     uint64_t mNOutputFenceVal;
+    uint64_t mNDecodeFenceVal;
 
     HANDLE mEvent;
 
@@ -214,6 +219,9 @@ private:
     std::vector<NV_ENC_INPUT_PTR> mVMappedRefBuffers;
 
     std::vector<void*> mVPCompletionEvent;
+
+    ID3D12GraphicsCommandList* pGfxCommandList;
+    ID3D12CommandQueue* pGfxCommandQueue;
 
     std::vector<uint8_t> mVEncodeOutData; // container constaining bitstream data
 
@@ -293,8 +301,8 @@ private:
     bool mRayTrace = true;
     bool mUseDOF = false;
     bool outputEncodedFrames = false;   // output as h264 file
-    bool outputDecodedFrames = false;   // output as bmp file
-    bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
+    bool outputDecodedFrames = true;   // output as bmp file
+    bool outputReferenceFrames = true; // output Falcor rendered frames as bmp file
     // bool showDecode = true;
 
     uint32_t mSampleIndex = 0xdeadbeef;
