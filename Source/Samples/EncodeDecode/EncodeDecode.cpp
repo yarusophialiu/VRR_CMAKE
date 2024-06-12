@@ -485,7 +485,7 @@ void EncodeDecode::makeDefaultEncodingParams(
     The quantization parameter influences the trade-off between video quality and file size.
     */
     pIntializeParams->encodeConfig->rcParams.rateControlMode = NV_ENC_PARAMS_RC_VBR; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
-    pIntializeParams->encodeConfig->rcParams.targetQuality = 50; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
+    pIntializeParams->encodeConfig->rcParams.targetQuality = 25; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
                                                                                      // NV_ENC_PARAMS_RC_VBR
     // mEncodeconfig.rcParams.constQP = {28, 31, 25};
     // pIntializeParams->encodeConfig->rcParams.constQP = {28, 31, 25}; // TODO: why set it like // ignored in CBR
@@ -593,9 +593,10 @@ void EncodeDecode::initEncoder()
 
     // set bitrate 500000 (low quality) 1000000 1200000 (1200 - standard definition)
     // 3000000 4000000 (4000 - hd) 5000000, 8000000 (full hd) 10000000 15 Mbps - 30 Mbps 30000000 (4k)
-    mEncodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
+    mEncodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_VBR; // NV_ENC_PARAMS_RC_VBR NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
     mEncodeConfig.rcParams.multiPass = NV_ENC_TWO_PASS_FULL_RESOLUTION; // not valid for h264
-    // mEncodeConfig.rcParams.averageBitRate = bitRate;
+    // disable below for CRF (target quality)
+    mEncodeConfig.rcParams.averageBitRate = bitRate;
     mEncodeConfig.rcParams.maxBitRate = bitRate;
     mEncodeConfig.rcParams.vbvBufferSize =
         // (mEncodeConfig.rcParams.averageBitRate * mEncoderInitializeParams.frameRateDen / mEncoderInitializeParams.frameRateNum) * 5;
