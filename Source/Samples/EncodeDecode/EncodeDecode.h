@@ -48,7 +48,14 @@ public:
 public:
     void setBitRate(unsigned int br);    // Setter for bitRate
     void setFrameRate(unsigned int fps); // Setter for frameRate
+    void setSpeed(unsigned int speed); // Setter for frameRate
+    void setSceneName(std::string sceneName); // Setter for frameRate
+    void setRefPrefix(std::string scene, unsigned int Input);
+    void setMotionPrefix(std::string scene, unsigned int Input, unsigned int framerate, unsigned int bitrate, unsigned int height);
+    void setDefaultScene(std::string scenePath);
 
+
+    // void setMotionFile(std::string name); // Setter for frameRate
 private:
     /*
 
@@ -139,7 +146,7 @@ private:
     void setPerFrameVars(const Fbo* pTargetFbo);
     void renderRaster(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo);
     void renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo, int fCount);
-    void createMipMaps(RenderContext* pRenderContext); 
+    void createMipMaps(RenderContext* pRenderContext);
 
 
 private:
@@ -189,7 +196,8 @@ private:
     // here, fence lets the program pause until decoding is done to a frame
     ID3D12Fence* mpInputFence;
     ID3D12Fence* mpOutputFence;
-    ID3D12Fence* mpDecodeFence;
+    // ID3D12Fence* mpDecodeFence;
+    Falcor::ref<Falcor::Fence> mpDecodeFence;
 
     uint64_t mNInputFenceVal;
     uint64_t mNOutputFenceVal;
@@ -300,21 +308,27 @@ private:
 
     bool mRayTrace = true;
     bool mUseDOF = false;
-    bool outputEncodedFrames = false;   // output as h264 file
-    bool outputDecodedFrames = true;   // output as bmp file
-    bool outputReferenceFrames = true; // output Falcor rendered frames as bmp file
+    bool outputEncodedFrames = true;   // output as h264 file to C:\Users\15142\new\Falcor\Source\Samples\EncodeDecode\encodedH264
+    bool outputDecodedFrames = false;   // output as bmp file
+    bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
     // bool showDecode = true;
 
     uint32_t mSampleIndex = 0xdeadbeef;
-    //char szOutFilePath[256] = "encodedH264/out.h264";
+    char kDefaultScene[256] = "";
+    char szRefPrefixFilePath[256] = "encodedH264/";
+    char szMotionPrefixFilePath[256] = "motion/";
     char szOutFilePath[256] = "";
     char szRefOutFilePath[256];
     char szDecOutFilePath[256];
+    // const char* refBaseFilePath = "D:/VRR-frame/room-normal/refOutputBMP/";
+    // const char* decBaseFilePath = "D:/VRR-frame/room-normal/decOutputBMP/";
+
     const char* refBaseFilePath = "refOutputBMP/";
     const char* decBaseFilePath = "decOutputBMP/";
     std::ofstream* fpEncOut;
 
-    char motionFilePath[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/decOutputBMP/motion.txt";
+    // char motionFilePath[256] = "C:/Users/15142/new/Falcor/Source/Samples/EncodeDecode/decOutputBMP/motion.txt";
+    char motionFilePath[256] = ""; // search oss
 
     //const int frameRate = 30;
     //const int frameLimit = 10 * frameRate / 30; // 206, 516
@@ -322,6 +336,8 @@ private:
     unsigned int frameRate;
     uint32_t frameLimit;
     unsigned int bitRate;
+    unsigned int speed;
+    std::string sceneName;
 
     int mipLevels;
 
