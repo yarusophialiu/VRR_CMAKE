@@ -325,7 +325,7 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
    // mpCamera->setPosition(currPos);
 
 
-    // std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n"; std::cout << "\n";
+    std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n"; std::cout << "\n";
 
     // Ugly hack, just to get consistent videos
     static double timeSecs = 0;
@@ -360,17 +360,27 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
 
         // write to bmp file
-        if (outputReferenceFrames)
+        // int frameIdx = frameRate - 1;
+        // std::cout <<
+        // bool isAnimated1 = mpCamera->isAnimated();
+        // mpCamera->setIsAnimated(false);
+
+        // bool isAnimated2 = mpCamera->isAnimated();
+
+        if (outputReferenceFrames && (fCount_rt >= frameRate))
+        // if (outputReferenceFrames)
         {
-            snprintf(szRefOutFilePath, sizeof(szRefOutFilePath), "%s%d.bmp", refBaseFilePath, fcount);
-            mpRtOut->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
+            std::cout<< "fCount_rt-frameRate " << fCount_rt-frameRate << "\n";
+            snprintf(szRefOutFilePath, sizeof(szRefOutFilePath), "%s%d.bmp", refBaseFilePath, fCount_rt-frameRate);
+            // mpRtOut->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
+            mpRenderGraph->getOutput("TAA.colorOut")->asTexture()->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
             // ref<Texture> mpFXAA = mpRenderGraph->getOutput("FXAA.dst")->asTexture();
             // mpFXAA->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
         }
 
         if (fCount_rt > 0)  // 2
         {
-        // std::cout << "fCount_rt: " << fCount_rt << "\n";
+        std::cout << "fCount_rt: " << fCount_rt << "\n";
 
         encodeFrameBuffer(); // write encoded data into h264
         // decodeFrameBuffer();
@@ -484,8 +494,8 @@ void EncodeDecode::makeDefaultEncodingParams(
     entire video sequence,  compression level remains consistent for the entire video.
     The quantization parameter influences the trade-off between video quality and file size.
     */
-    pIntializeParams->encodeConfig->rcParams.rateControlMode = NV_ENC_PARAMS_RC_VBR; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
-    pIntializeParams->encodeConfig->rcParams.targetQuality = 25; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
+    pIntializeParams->encodeConfig->rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
+    // pIntializeParams->encodeConfig->rcParams.targetQuality = 50; // NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
                                                                                      // NV_ENC_PARAMS_RC_VBR
     // mEncodeconfig.rcParams.constQP = {28, 31, 25};
     // pIntializeParams->encodeConfig->rcParams.constQP = {28, 31, 25}; // TODO: why set it like // ignored in CBR
@@ -593,10 +603,11 @@ void EncodeDecode::initEncoder()
 
     // set bitrate 500000 (low quality) 1000000 1200000 (1200 - standard definition)
     // 3000000 4000000 (4000 - hd) 5000000, 8000000 (full hd) 10000000 15 Mbps - 30 Mbps 30000000 (4k)
-    mEncodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_VBR; // NV_ENC_PARAMS_RC_VBR NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
+    mEncodeConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR; // NV_ENC_PARAMS_RC_VBR NV_ENC_PARAMS_RC_CONSTQP, NV_ENC_PARAMS_RC_CBR,
     mEncodeConfig.rcParams.multiPass = NV_ENC_TWO_PASS_FULL_RESOLUTION; // not valid for h264
     // disable below for CRF (target quality)
     mEncodeConfig.rcParams.averageBitRate = bitRate;
+    // mEncodeConfig.rcParams.averageBitRate = 0;
     mEncodeConfig.rcParams.maxBitRate = bitRate;
     mEncodeConfig.rcParams.vbvBufferSize =
         // (mEncodeConfig.rcParams.averageBitRate * mEncoderInitializeParams.frameRateDen / mEncoderInitializeParams.frameRateNum) * 5;
@@ -604,7 +615,7 @@ void EncodeDecode::initEncoder()
     // mEncodeConfig.rcParams.maxBitRate = mEncodeConfig.rcParams.averageBitRate;
     mEncodeConfig.rcParams.vbvInitialDelay = mEncodeConfig.rcParams.vbvBufferSize;
 
-    // std::cout << "\naverageBitRate " << mEncodeConfig.rcParams.averageBitRate << "\n";
+    std::cout << "\naverageBitRate " << mEncodeConfig.rcParams.averageBitRate << "\n";
     std::cout << "\nmaxBitRate " << mEncodeConfig.rcParams.maxBitRate << "\n";
 
     NVENC_API_CALL(mNVEnc.nvEncInitializeEncoder(mHEncoder, &mEncoderInitializeParams));
@@ -1407,7 +1418,7 @@ void EncodeDecode::setBitRate(unsigned int br)
 void EncodeDecode::setFrameRate(unsigned int fps)
 {
     frameRate = fps; // Assign the private member
-    frameLimit = 45 * frameRate / 30.0; // 68, 34, 45, 30
+    frameLimit = frameRate + numOfFrames * frameRate / 30.0; // 68, 34, 45, 30
     std::cout << "setFrameRate  " << frameRate << "\n";
     std::cout << "frameLimit  " << frameLimit << "\n";
 }
@@ -1523,7 +1534,7 @@ int runMain(int argc, char** argv)
     // // std::string scenePath = "test_scenes/grey_and_white_room/paint.fbx"; // BistroInterior  bistro_path3
     // // std::string scenePath = "SunTemple/frontstatue.fbx"; // BistroInterior  bistro_path3
     // // std::string scenePath = "SunTemple/SunTemple.fbx"; // BistroInterior  bistro_path3
-    // std::string scenePath = "SunTemple/statue.fbx"; // BistroInterior  bistro_path3
+    // std::string scenePath = "SunTemple/statue_freeze2.fbx"; // BistroInterior  bistro_path3
     // // std::string scenePath = "crytek_sponza/sponza_light2.fbx"; // black
     // // std::string scenePath = "crytek_sponza/sponza_light1.fbx"; // black
     // // std::string scenePath = "breakfast_room/breakfastroom2.fbx";
