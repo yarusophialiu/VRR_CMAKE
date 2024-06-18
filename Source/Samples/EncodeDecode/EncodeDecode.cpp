@@ -300,32 +300,17 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
     pRenderContext->clearFbo(pTargetFbo.get(), kClearColor, 1.0f, 0, FboAttachmentType::All);
 
     // change camera position
-    // std::cout << "\n";
-    // auto currPos = mpCamera->getPosition();
-    //std::cout << "mpCamera: (" << currPos.x << ", " << currPos.y << ", " << currPos.z << ")\n";
-    // room
- /*   currPos.x += 0.00083692f;
-    currPos.y += -0.00188664f;
-    currPos.z += -0.00496207f;*/
 
  /*   currPos.x += (0.00083692L * 30.0 / frameRate);
     currPos.y += (-0.00188664L * 30.0 / frameRate);
     currPos.z += (-0.00496207L * 30.0 / frameRate);*/
-
-// [0.027533 0.00049  0.01221 ]
-// 0.0135L, 0.00025L, 0.0061L
     // currPos.x += (0.0675L * 30.0 / frameRate);
     // currPos.y += (0.000125L * 30.0 / frameRate);
     // currPos.z += (0.00305L * 30.0 / frameRate);
-
-
-    // currPos.x += 0.013;
-    // currPos.y += 0.004;
-    // currPos.z += 0.011;
    // mpCamera->setPosition(currPos);
 
 
-    std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n"; std::cout << "\n";
+    // std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n"; std::cout << "\n";
 
     // Ugly hack, just to get consistent videos
     static double timeSecs = 0;
@@ -358,19 +343,10 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
         cpuWaitForFencePoint(mpDecodeFence->getNativeHandle().as<ID3D12Fence*>(), mNDecodeFenceVal);
 
-
-        // write to bmp file
-        // int frameIdx = frameRate - 1;
-        // std::cout <<
-        // bool isAnimated1 = mpCamera->isAnimated();
-        // mpCamera->setIsAnimated(false);
-
-        // bool isAnimated2 = mpCamera->isAnimated();
-
         if (outputReferenceFrames && (fCount_rt >= frameRate))
         // if (outputReferenceFrames)
         {
-            std::cout<< "fCount_rt-frameRate " << fCount_rt-frameRate << "\n";
+            // std::cout<< "fCount_rt-frameRate " << fCount_rt-frameRate << "\n";
             snprintf(szRefOutFilePath, sizeof(szRefOutFilePath), "%s%d.bmp", refBaseFilePath, fCount_rt-frameRate);
             // mpRtOut->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
             mpRenderGraph->getOutput("TAA.colorOut")->asTexture()->captureToFile(0, 0, szRefOutFilePath, Bitmap::FileFormat::BmpFile, Bitmap::ExportFlags::None, false);
@@ -380,12 +356,11 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
         if (fCount_rt > 0)  // 2
         {
-        std::cout << "fCount_rt: " << fCount_rt << "\n";
+        // std::cout << "fCount_rt: " << fCount_rt << "\n";
 
         encodeFrameBuffer(); // write encoded data into h264
         // decodeFrameBuffer();
 
-        //  write to bmp file
         if (outputDecodedFrames)
         {
             snprintf(szDecOutFilePath, sizeof(szDecOutFilePath), "%s%d.bmp", decBaseFilePath, fcount);
@@ -1433,7 +1408,7 @@ void EncodeDecode::setSpeed(unsigned int input)
 
 void EncodeDecode::setRefPrefix(std::string scene, unsigned int speedInput)
 {
-    std::string fullPath = std::string(szRefPrefixFilePath) + scene + std::to_string(speedInput) + "/";
+    std::string fullPath = std::string(szRefPrefixFilePath) + scene + "_" + std::to_string(speedInput) + "/";
 
     // Ensure the result fits into the original char array
     if (fullPath.length() < sizeof(szRefPrefixFilePath)) {
@@ -1526,15 +1501,16 @@ int runMain(int argc, char** argv)
     // unsigned int height = 720; // 1080 720
     // unsigned int bitrate = 6000;
     // unsigned int framerate = 30;
-    // std::string scene = "suntemple_statue";
+    // std::string scene = "suntemple_path1_seg1";
 
-    // unsigned int speedInput = 1;
+    // unsigned int speedInput = 3;
     // // std::string scenePath = "Bistro/Bistro/bistro_path3.fbx"; // BistroInterior  bistro_path3
     // // std::string scenePath = "test_scenes/grey_and_white_room/grey_and_white_room.fbx"; // BistroInterior  bistro_path3
     // // std::string scenePath = "test_scenes/grey_and_white_room/paint.fbx"; // BistroInterior  bistro_path3
-    // // std::string scenePath = "SunTemple/frontstatue.fbx"; // BistroInterior  bistro_path3
-    // // std::string scenePath = "SunTemple/SunTemple.fbx"; // BistroInterior  bistro_path3
-    // std::string scenePath = "SunTemple/statue_freeze2.fbx"; // BistroInterior  bistro_path3
+    // // std::string scenePath = "SunTemple/frontstatue.fbx"; //
+    // // std::string scenePath = "SunTemple/SunTemple.fbx"; //
+    // // std::string scenePath = "SunTemple/statue_freeze2.fbx"; //
+    // std::string scenePath = "crytek_sponza/path1.fbx"; //
     // // std::string scenePath = "crytek_sponza/sponza_light2.fbx"; // black
     // // std::string scenePath = "crytek_sponza/sponza_light1.fbx"; // black
     // // std::string scenePath = "breakfast_room/breakfastroom2.fbx";
@@ -1544,15 +1520,15 @@ int runMain(int argc, char** argv)
 
 
 
-    // std::cout << "\n\nframerate runmain  " << framerate << "\n";
-    // std::cout << "bitrate runmain  " << bitrate << "\n";
-    // std::cout << "width runmain  " << width << "\n";
-    // std::cout << "height runmain  " << height << "\n";
-    // std::cout << "scene " << scene << std::endl;
-    // std::cout << "speed " << speedInput << std::endl;
-    // std::cout << "scenePath " << scenePath << std::endl;
-    // //std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
-    // //std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
+    std::cout << "\n\nframerate runmain  " << framerate << "\n";
+    std::cout << "bitrate runmain  " << bitrate << "\n";
+    std::cout << "width runmain  " << width << "\n";
+    std::cout << "height runmain  " << height << "\n";
+    std::cout << "scene " << scene << std::endl;
+    std::cout << "speed " << speedInput << std::endl;
+    std::cout << "scenePath " << scenePath << std::endl;
+    //std::cout << "\n\nbitrate std::stoi(argv[1])  " << std::stoi(argv[1]) << "/n";
+    //std::cout << "\n\nnframerate std::stoi(argv[2])  " << std::stoi(argv[2]) << "/n";
 
     SampleAppConfig config;
     config.windowDesc.title = "EncodeDecode";
