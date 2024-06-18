@@ -308,9 +308,9 @@ private:
 
     bool mRayTrace = true;
     bool mUseDOF = false;
-    bool outputEncodedFrames = true;   // output as h264 file to C:\Users\15142\new\Falcor\Source\Samples\EncodeDecode\encodedH264
+    bool outputEncodedFrames = false;   // output as h264 file to C:\Users\15142\new\Falcor\Source\Samples\EncodeDecode\encodedH264
     bool outputDecodedFrames = false;   // output as bmp file
-    bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
+    bool outputReferenceFrames = true; // output Falcor rendered frames as bmp file
     // bool showDecode = true;
 
     uint32_t mSampleIndex = 0xdeadbeef;
@@ -333,7 +333,7 @@ private:
     //const int frameRate = 30;
     //const int frameLimit = 10 * frameRate / 30; // 206, 516
 
-    unsigned int frameRate;
+    signed int frameRate;
     uint32_t frameLimit;
     unsigned int bitRate;
     unsigned int speed;
@@ -342,6 +342,7 @@ private:
     int mipLevels;
 
     unsigned int decodeMutex = 0;
+    unsigned int numOfFrames = 50;
 
     // const Math::float3& incre = float3(0.00088767 - 0.00192412 - 0.00504681);
 };
