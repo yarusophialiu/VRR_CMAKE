@@ -4,11 +4,14 @@
 
 #include <filesystem>
 #include <iostream>
+#include <curl/curl.h>
 #include <d3d12.h>
 #include <d3d11.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
 #include <iomanip>
+#include <random>
+#include <cppcodec/base64_rfc4648.hpp>
 
 #include "Utils/Math/FalcorMath.h"
 #include "Utils/UI/TextRenderer.h"
@@ -37,6 +40,8 @@ namespace fs = std::filesystem;
 
 FALCOR_EXPORT_D3D12_AGILITY_SDK
 simplelogger::Logger* logger = simplelogger::LoggerFactory::CreateConsoleLogger();
+std::chrono::steady_clock::time_point last_send_time = std::chrono::steady_clock::now();
+
 
 // Macor for making NVENC API calls and reporting errors when they fail
 #define NVENC_API_CALL(nvencAPI)                                               \
@@ -89,8 +94,6 @@ DXGI_FORMAT GetD3D12Format(NV_ENC_BUFFER_FORMAT eBufferFormat)
     }
 }
 
-#include <fstream>
-#include <cstdint>
 
 #pragma pack(push, 1)
 struct BMPHeader
@@ -112,6 +115,7 @@ struct BMPHeader
     uint32_t importantColors; // Number of important colors used (0 for 32-bit)
 };
 #pragma pack(pop)
+
 
 void writeBMP(const char* filename, uint8_t* imageData, int width, int height)
 {
@@ -146,20 +150,108 @@ void writeBMP(const char* filename, uint8_t* imageData, int width, int height)
     // file.close();
 }
 
+std::pair<uint32_t, uint32_t> getRandomStartCoordinates(int frameWidth, int frameHeight, int patchWidth, int patchHeight) {
+    // Random number generation setup
+    std::random_device rd;  // Seed
+    std::mt19937 gen(rd());  // Mersenne Twister generator
+    std::uniform_int_distribution<> distribX(0, frameWidth - patchWidth);
+    std::uniform_int_distribution<> distribY(0, frameHeight - patchHeight);
+
+    // Generate random startX and startY within valid bounds
+    uint32_t startX = distribX(gen);
+    uint32_t startY = distribY(gen);
+
+    return {startX, startY};
+}
+
+
+// Encode the patch data as base64 string
+std::string base64_encode_patch(const std::vector<uint8_t>& patchData) {
+    return cppcodec::base64_rfc4648::encode(patchData);
+}
+
+// Function to asynchronously send patch and velocity to the HTTP server
+// const std::vector<std::vector<float>>& patch
+void send_http_request_async(const std::vector<uint8_t>& patchData, float velocity) {
+    std::thread([patchData, velocity]() {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        CURLM* multi_handle;
+        CURL* easy_handle;
+        // When still_running becomes 0, it means all HTTP requests have completed, and you can proceed with any post-processing steps or cleanup.
+        int still_running = 0; // Number of active transfers
+
+        // Create a JSON object with patch and velocity
+        nlohmann::json j;
+        // Base64 encode the patch data and add to the JSON
+        std::string encodedPatch = base64_encode_patch(patchData);
+        j["patch"] = encodedPatch;
+        j["velocity"] = velocity;
+
+        // Convert JSON to string
+        std::string json_str = j.dump();
+        // Initialize curl easy and multi handles
+        easy_handle = curl_easy_init();
+        multi_handle = curl_multi_init();
+
+        if (easy_handle && multi_handle) {
+            // Set URL and POST data
+            curl_easy_setopt(easy_handle, CURLOPT_URL, "http://localhost:8000/predict");
+            curl_easy_setopt(easy_handle, CURLOPT_POSTFIELDS, json_str.c_str());
+
+            // Set HTTP headers
+            struct curl_slist* headers = NULL;
+            headers = curl_slist_append(headers, "Content-Type: application/json");
+            curl_easy_setopt(easy_handle, CURLOPT_HTTPHEADER, headers);
+
+            // Add easy handle to multi handle
+            curl_multi_add_handle(multi_handle, easy_handle);
+
+            // Perform the request asynchronously
+            curl_multi_perform(multi_handle, &still_running);
+
+            // Polling loop to check the status of the request
+            while (still_running) {
+                int numfds;
+                curl_multi_wait(multi_handle, NULL, 0, 1000, &numfds);  // Wait for data/events
+                curl_multi_perform(multi_handle, &still_running);       // Perform any outstanding transfers
+            }
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::cout << "Request completed in: " << elapsed_seconds.count() << " seconds\n";
+
+
+            curl_multi_remove_handle(multi_handle, easy_handle);
+            curl_easy_cleanup(easy_handle);
+            curl_multi_cleanup(multi_handle);
+        }
+    }).detach(); // Detach the thread to run independently
+}
+
+
+// void send_patch_if_needed() {
+//     std::cout << "enter: send_patch_if_needed  " << "\n";
+//     auto current_time = std::chrono::steady_clock::now();
+//     std::chrono::duration<double> time_elapsed = current_time - last_send_time;
+//     std::cout << "time_elapsed  " << time_elapsed.count() << "\n";
+
+//     if (time_elapsed.count() >= 5.0) {
+//         // Capture patch and velocity and send to the server
+//         // std::vector<std::vector<float>> patch = capture_patch();  // Example capture function
+//         float velocity = 0.75;  // Example velocity calculation
+//         send_http_request_async(velocity);
+
+//         // Update the last_send_time
+//         last_send_time = current_time;
+//     }
+// }
+
+
 // static const Falcor::float4 kClearColor(0.38f, 0.52f, 0.10f, 1);
 // static const Falcor::float4 kClearColor(0.5f, 0.16f, 0.098f, 1);
 static const Falcor::float4 kClearColor(1.f, 0.f, 0.0f, 1);
-/*
-Arcade/Arcade.pyscene
-test_scenes/two_volumes.pyscene
-test_scenes/grey_and_white_room/grey_and_white_room.fbx
-SunTemple_v4/SunTemple_v4/SunTemple/SunTemple.pyscene
-Bistro/Bistro/BistroInterior_Wine.fbx
-Bistro/Bistro/BistroInterior.fbx
-Bistro/Bistro/BistroExterior.fbx
-*/
-// static const std::string kDefaultScene = "test_scenes/grey_and_white_room/grey_and_white_room.fbx";
-// static const std::string kDefaultScene = "Arcade/Arcade.pyscene";
+
 
 // constructor
 EncodeDecode::EncodeDecode(const SampleAppConfig& config) : SampleApp(config)
@@ -244,26 +336,16 @@ void EncodeDecode::onLoad(RenderContext* pRenderContext)
     // mpRenderGraph->createPass("FXAA", "FXAA", fXAAProps);
     mpRenderGraph->createPass("TAA", "TAA", fXAAProps);
 
-    //// create deferred shading pass: position, materials, normals
-    //mpRenderGraph->createPass("DeferredShading", "DeferredShading", deferredShadingProps);
-    //// add deferred shading pass
-
     mpRenderGraph->onResize(getTargetFbo().get());
     mpRenderGraph->setScene(mpScene);
 
     mpRenderGraph->addEdge("GBuffer.mvec", "TAA.motionVecs"); // source texture, output texture
     ////mpRenderGraph->markOutput("GBuffer.mvec"); // Mark a render pass output as the graph's output.
-    //mpRenderGraph->markOutput("DeferredShading.dst");
 
     mpRenderGraph->markOutput("TAA.colorOut");
     mpRenderGraph->setInput("TAA.colorIn", mpRtOut);
 
     mpRenderGraph->compile(pRenderContext, log);
-
-
-    // mpRenderGraph->markOutput("GBuffer.mvec"); // Mark a render pass output as the graph's output
-    // mpRenderGraph->markOutput("FXAA.dst");
-    // mpRenderGraph->setInput("FXAA.src", mpRtOut);
 
 
     // allocate memory so encoder can work with what we need
@@ -294,27 +376,49 @@ void EncodeDecode::onResize(uint32_t width, uint32_t height)
     }
 }
 
+// Function to extract a 128x128 patch from the rendered frame
+// mpRenderGraph->getOutput("TAA.colorOut")->asTexture()
+// frame is likely on gpu. pRenderContext: The rendering context. Use it to bind state and dispatch calls to the GPU
+void EncodeDecode::extract_patch_from_frame(std::vector<uint8_t>& renderedFrameVal, uint32_t frameWidth, uint32_t frameHeight, uint32_t patchWidth, uint32_t patchHeight, std::vector<uint8_t>& patchData)
+{
+    // std::cerr << "frameWidth " << frameWidth << std::endl;
+    // std::cerr << "frameHeight " << frameHeight << std::endl;
+    // std::cerr << "patchWidth " << patchWidth << std::endl;
+    // std::cerr << "patchHeight " << patchHeight << std::endl;
+    uint32_t numChannels = 4;  // For BGRA8 format (8 bits per channel, 4 channels)
+    auto [startX, startY] = getRandomStartCoordinates(frameWidth, frameHeight, patchWidth, patchHeight);
+    // uint32_t startX = 0;
+    // uint32_t startY = 0;
+    std::cout << "Random startX: " << startX << ", startY: " << startY << std::endl;
+
+    // Make sure the patch doesn't exceed the texture bounds
+    if (startX + patchWidth > frameWidth || startY + patchHeight > frameHeight) {
+        std::cerr << "Patch exceeds texture bounds!" << std::endl;
+        return;
+    }
+
+    // Extract the patch
+    for (uint32_t y = 0; y < patchHeight; ++y) {
+        for (uint32_t x = 0; x < patchWidth; ++x) {
+            uint32_t fullIndex = ((startY + y) * frameWidth + (startX + x)) * numChannels;
+            uint32_t patchIndex = (y * patchWidth + x) * 3;
+            // Convert from BGRA to RGBA by swapping the B and R channels
+            patchData[patchIndex] = renderedFrameVal[fullIndex + 2];       // Red
+            patchData[patchIndex + 1] = renderedFrameVal[fullIndex + 1];   // Green
+            patchData[patchIndex + 2] = renderedFrameVal[fullIndex];       // Blue
+        }
+    }
+}
+
 
 void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
 {
+
     pRenderContext->clearFbo(pTargetFbo.get(), kClearColor, 1.0f, 0, FboAttachmentType::All);
 
-    // change camera position
+    // std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n";
 
- /*   currPos.x += (0.00083692L * 30.0 / frameRate);
-    currPos.y += (-0.00188664L * 30.0 / frameRate);
-    currPos.z += (-0.00496207L * 30.0 / frameRate);*/
-    // currPos.x += (0.0675L * 30.0 / frameRate);
-    // currPos.y += (0.000125L * 30.0 / frameRate);
-    // currPos.z += (0.00305L * 30.0 / frameRate);
-   // mpCamera->setPosition(currPos);
-
-
-    // std::cout << "mpCamera: (" << mpCamera->getPosition().x << ", " << mpCamera->getPosition().y << ", " << mpCamera->getPosition().z << ")\n"; std::cout << "\n";
-
-    // Ugly hack, just to get consistent videos
     static double timeSecs = 0;
-
     if (mpScene)
     {
         Scene::UpdateFlags updates = mpScene->update(pRenderContext, speed * timeSecs); // 2* timesec, 0.5
@@ -333,8 +437,28 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
             renderRaster(pRenderContext, pTargetFbo);
 
         mpRenderGraph->execute(pRenderContext);
-        // pRenderContext->blit(mpRenderGraph->getOutput("FXAA.dst")->getSRV(), pTargetFbo->getRenderTargetView(0));
+        // blit from one frame buffer (or texture) to another
+        // important for displaying the final rendered image to the screen
+        // framebuffer object (FBO) that represents the final render target, usually the screen or a backbuffer
         pRenderContext->blit(mpRenderGraph->getOutput("TAA.colorOut")->getSRV(), pTargetFbo->getRenderTargetView(0));
+
+        // send_patch_if_needed();
+        if (fcount == 100) {
+            ref<Texture> frameTexture = mpRenderGraph->getOutput("TAA.colorOut")->asTexture();
+            uint32_t frameWidth = frameTexture->getWidth();
+            uint32_t frameHeight = frameTexture->getHeight();
+            // auto format = frameTexture->getFormat(); // BGRA8Unorm (47)
+            uint32_t patchWidth = 128;
+            uint32_t patchHeight = 128;
+
+            std::vector<uint8_t> renderedFrameVal = pRenderContext->readTextureSubresource(frameTexture.get(), 0);
+            std::vector<uint8_t> patchData(patchWidth * patchHeight * 3);
+            extract_patch_from_frame(renderedFrameVal, frameWidth, frameHeight, patchWidth, patchHeight, patchData);
+            stbi_write_png("patch_output_rgba.png", patchWidth, patchHeight, 3, patchData.data(), patchWidth * 3);
+
+            // send_http_request_async(patchData, 0.75);
+            // send_http_request_async(0.75);
+        }
 
         // // allocate memory so encoder can work with what we need
         // // one buffer each time
@@ -356,30 +480,30 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
 
         if (fCount_rt > 0)  // 2
         {
-        // std::cout << "fCount_rt: " << fCount_rt << "\n";
+            // std::cout << "fCount_rt: " << fCount_rt << "\n";
 
-        encodeFrameBuffer(); // write encoded data into h264
-        // decodeFrameBuffer();
+            encodeFrameBuffer(); // write encoded data into h264
+            // decodeFrameBuffer();
 
-        if (outputDecodedFrames)
-        {
-            snprintf(szDecOutFilePath, sizeof(szDecOutFilePath), "%s%d.bmp", decBaseFilePath, fcount);
-            writeBMP(szDecOutFilePath, mPHostRGBAFrame, mWidth, mHeight);
-        }
+            if (outputDecodedFrames)
+            {
+                snprintf(szDecOutFilePath, sizeof(szDecOutFilePath), "%s%d.bmp", decBaseFilePath, fcount);
+                writeBMP(szDecOutFilePath, mPHostRGBAFrame, mWidth, mHeight);
+            }
 
-
-        if (frameLimit > 0 && fcount >= frameLimit)
-        {
-            std::exit(0);
-        }
+            if (frameLimit > 0 && fcount >= frameLimit)
+            {
+                std::exit(0);
+            }
         }
         fCount_rt += 1;
         ++fcount;
         // std::cout << "fcount " << fcount << "\n";
         timeSecs += 1.0 / frameRate;
     }
-
     getTextRenderer().render(pRenderContext, getFrameRate().getMsg(), pTargetFbo, {20, 20});
+
+
 }
 
 void EncodeDecode::onGuiRender(Gui* pGui)
@@ -1394,8 +1518,10 @@ void EncodeDecode::setFrameRate(unsigned int fps)
 {
     frameRate = fps; // Assign the private member
     frameLimit = frameRate + numOfFrames * frameRate / 30.0; // 68, 34, 45, 30
+    // last_send_time = std::chrono::steady_clock::now();
     std::cout << "setFrameRate  " << frameRate << "\n";
     std::cout << "frameLimit  " << frameLimit << "\n";
+    // std::cout << "setvlast_send_time  " << "\n";
 }
 
 
@@ -1487,38 +1613,27 @@ void EncodeDecode::renderRT(RenderContext* pRenderContext, const ref<Fbo>& pTarg
     // pRenderContext->blit(mpRtOut->getSRV(), pTargetFbo->getRenderTargetView(0));
 }
 
+
+
+
 int runMain(int argc, char** argv)
 {
-    unsigned int bitrate = std::stoi(argv[1]);
-    unsigned int framerate = std::stoi(argv[2]);
-    unsigned int width = std::stoi(argv[3]);
-    unsigned int height = std::stoi(argv[4]);
-    std::string scene = argv[5];
-    unsigned int speedInput = std::stoi(argv[6]);
-    std::string scenePath = argv[7];
+    // unsigned int bitrate = std::stoi(argv[1]);
+    // unsigned int framerate = std::stoi(argv[2]);
+    // unsigned int width = std::stoi(argv[3]);
+    // unsigned int height = std::stoi(argv[4]);
+    // std::string scene = argv[5];
+    // unsigned int speedInput = std::stoi(argv[6]);
+    // std::string scenePath = argv[7];
 
-    // unsigned int width = 1280; // 1920 1280
-    // unsigned int height = 720; // 1080 720
-    // unsigned int bitrate = 6000;
-    // unsigned int framerate = 30;
-    // std::string scene = "suntemple_path1_seg1";
+    unsigned int width = 1920; // 1920 1280
+    unsigned int height = 1080; // 1080 720
+    unsigned int bitrate = 6000;
+    unsigned int framerate = 166;
+    std::string scene = "lost_empire";
 
-    // unsigned int speedInput = 3;
-    // // std::string scenePath = "Bistro/Bistro/bistro_path3.fbx"; // BistroInterior  bistro_path3
-    // // std::string scenePath = "test_scenes/grey_and_white_room/grey_and_white_room.fbx"; // BistroInterior  bistro_path3
-    // // std::string scenePath = "test_scenes/grey_and_white_room/paint.fbx"; // BistroInterior  bistro_path3
-    // // std::string scenePath = "SunTemple/frontstatue.fbx"; //
-    // // std::string scenePath = "SunTemple/SunTemple.fbx"; //
-    // // std::string scenePath = "SunTemple/statue_freeze2.fbx"; //
-    // std::string scenePath = "crytek_sponza/path1.fbx"; //
-    // // std::string scenePath = "crytek_sponza/sponza_light2.fbx"; // black
-    // // std::string scenePath = "crytek_sponza/sponza_light1.fbx"; // black
-    // // std::string scenePath = "breakfast_room/breakfastroom2.fbx";
-    // // std::string scenePath = "living_room/livingroom3.fbx"; // black, lots of light
-    // // std::string scenePath = "sponza/sponza17.fbx"; // lack of ambient light?
-    // // std::string scenePath = "lost-empire/lost_empire2.fbx"; // no texture, objects are black
-
-
+    unsigned int speedInput = 1;
+    std::string scenePath = "lost_empire/path1_seg1.fbx"; // no texture, objects are black
 
     std::cout << "\n\nframerate runmain  " << framerate << "\n";
     std::cout << "bitrate runmain  " << bitrate << "\n";
@@ -1540,7 +1655,7 @@ int runMain(int argc, char** argv)
     EncodeDecode encodeDecode(config);
     encodeDecode.setBitRate(bitrate * 1000); // 3000 bits per second,  3000 000 bits per second
     encodeDecode.setFrameRate(framerate);
-    encodeDecode.setRefPrefix(scene, speedInput);
+    // encodeDecode.setRefPrefix(scene, speedInput);
     encodeDecode.setDefaultScene(scenePath);
     encodeDecode.setSpeed(speedInput);
 
