@@ -4,8 +4,9 @@ add_falcor_executable(EncodeDecode)
 
 find_package(CUDAToolkit REQUIRED)
 
-add_dependencies(EncodeDecode GBuffer DeferredShading)
+add_dependencies(EncodeDecode GBuffer)
 # add_dependencies(EncodeDecode DeferredShading)
+
 
 target_sources(EncodeDecode PRIVATE
     EncodeDecode.cpp
@@ -20,12 +21,37 @@ target_sources(EncodeDecode PRIVATE
 
 set(NVENC_SDK_ROOT "C:/Video_Codec_SDK_12.1.14/Video_Codec_SDK_12.1.14")
 set(NVENC_SDK_LIB_DIR "${NVENC_SDK_ROOT}/Lib/x64")
+set(NVENC_CURL_DIR "C:/curl-8.10.1_2")
+set(NVENC_CURL_LIB_DIR "${NVENC_CURL_DIR}/lib")
+set(CODEC_ROOT "C:/cppcodec")
 
 add_library(ColorSpace STATIC ColorSpace.cu)
 
-target_include_directories(EncodeDecode PRIVATE ${NVENC_SDK_ROOT}/Interface ${NVENC_SDK_ROOT}/Samples/Utils)
+target_include_directories(EncodeDecode PRIVATE
+${NVENC_SDK_ROOT}/Interface ${NVENC_SDK_ROOT}/Samples/Utils
+# ${OPENEXR_INCLUDE_DIRS}
+${NVENC_CURL_DIR}/include
+${CODEC_ROOT}
+)
 
-target_link_libraries(EncodeDecode PRIVATE ${NVENC_SDK_LIB_DIR}/nvcuvid.lib ${NVENC_SDK_LIB_DIR}/nvencodeapi.lib CUDA::cudart ColorSpace d3d11.lib dxgi.lib)
+target_link_libraries(EncodeDecode PRIVATE
+${NVENC_SDK_LIB_DIR}/nvcuvid.lib
+${NVENC_SDK_LIB_DIR}/nvencodeapi.lib
+${NVENC_CURL_LIB_DIR}/libcurl.dll.a
+# ${NVENC_CURL_DIR}/bin/libcurl-x64.dll
+CUDA::cudart
+ColorSpace
+d3d11.lib
+dxgi.lib)
+
+# target_link_libraries(EncodeDecode PRIVATE
+#     ${NVENC_SDK_LIB_DIR}/nvcuvid.lib
+#     ${NVENC_SDK_LIB_DIR}/nvencodeapi.lib
+#     CUDA::cudart
+#     ColorSpace
+#     d3d11.lib
+#     dxgi.lib
+# )
 
 target_copy_shaders(EncodeDecode Samples/EncodeDecode)
 
