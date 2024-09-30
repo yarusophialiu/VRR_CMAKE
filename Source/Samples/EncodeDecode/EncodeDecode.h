@@ -85,6 +85,8 @@ private:
         NV_ENC_BUFFER_USAGE bufferUsage,
         NV_ENC_FENCE_POINT_D3D12* pInputFencePoint = nullptr
     );
+
+    void extract_patch_from_frame(std::vector<uint8_t>& renderedFrameVal, uint32_t frameWidth, uint32_t frameHeight, uint32_t patchWidth, uint32_t patchHeight, std::vector<uint8_t>& patchData);
     // Gte the number of chroma planes based on the encoder pixel format.
     uint32_t getEncoderNumChromaPlanes(const NV_ENC_BUFFER_FORMAT bufferFormat);
     // Get encoder frame size, in bytes.
@@ -310,7 +312,7 @@ private:
     bool mUseDOF = false;
     bool outputEncodedFrames = false;   // output as h264 file to C:\Users\15142\new\Falcor\Source\Samples\EncodeDecode\encodedH264
     bool outputDecodedFrames = false;   // output as bmp file
-    bool outputReferenceFrames = true; // output Falcor rendered frames as bmp file
+    bool outputReferenceFrames = false; // output Falcor rendered frames as bmp file
     // bool showDecode = true;
 
     uint32_t mSampleIndex = 0xdeadbeef;
@@ -340,9 +342,12 @@ private:
     std::string sceneName;
 
     int mipLevels;
+    int mipLevelsCompute;
 
     unsigned int decodeMutex = 0;
     unsigned int numOfFrames = 50;
+    // std::chrono::steady_clock::time_point last_send_time = std::chrono::steady_clock::now();
+
 
     // const Math::float3& incre = float3(0.00088767 - 0.00192412 - 0.00504681);
 };
