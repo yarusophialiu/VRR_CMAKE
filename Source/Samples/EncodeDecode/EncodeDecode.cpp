@@ -203,9 +203,16 @@ void send_http_request_async(const std::vector<uint8_t>& patchData, float veloci
             struct curl_slist* headers = NULL;
             headers = curl_slist_append(headers, "Content-Type: application/json");
             curl_easy_setopt(easy_handle, CURLOPT_HTTPHEADER, headers);
-
             // Add easy handle to multi handle
             curl_multi_add_handle(multi_handle, easy_handle);
+
+            auto now = std::chrono::system_clock::now();
+            std::time_t currentTime = std::chrono::system_clock::to_time_t(now); // getting calendar time
+            std::tm* localTime = std::localtime(&currentTime);
+            std::cout << "Current local time: " << std::put_time(localTime, "%Y-%m-%d %H:%M:%S") << std::endl;
+            auto stop1 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed_seconds_stop0 = stop1 - start;
+            std::cout << "Before send patch takes: " << elapsed_seconds_stop0.count() << " seconds\n";
 
             // Perform the request asynchronously
             curl_multi_perform(multi_handle, &still_running);
@@ -218,7 +225,9 @@ void send_http_request_async(const std::vector<uint8_t>& patchData, float veloci
             }
 
             auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed_seconds_stop1 = end - stop1;
             std::chrono::duration<double> elapsed_seconds = end - start;
+            std::cout << "Request round trip: " << elapsed_seconds_stop1.count() << " seconds\n";
             std::cout << "Request completed in: " << elapsed_seconds.count() << " seconds\n";
 
 
@@ -456,7 +465,7 @@ void EncodeDecode::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& 
             extract_patch_from_frame(renderedFrameVal, frameWidth, frameHeight, patchWidth, patchHeight, patchData);
             stbi_write_png("patch_output_rgba.png", patchWidth, patchHeight, 3, patchData.data(), patchWidth * 3);
 
-            // send_http_request_async(patchData, 0.75);
+            send_http_request_async(patchData, 0.75);
             // send_http_request_async(0.75);
         }
 
